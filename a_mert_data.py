@@ -10,21 +10,21 @@ __df__ = pd.DataFrame(__mat_data__['Xtrain'])
 
 import numpy as np
 
-def __expected_value__(complete_samples:np.array, missing_sample:np.array, n:int, epsilon=1e-5):
+def __expected_value__(complete_samples:np.array, missing_sample:np.array, idx_missing:int, epsilon=1e-5):
     """This function calculates the expected value at position n for a given sample q, which has missing values.
     It calculates the expected values based on the first n values of complete samples in the X.
     The weighted average of the labels is calculated based on the distance of the first n values of q and the complete samples in X.
     Args:
         known_values = sample_missing_values[:i] (np.array): A 2D array of shape (n_samples, n_features). Array with full data.
         known_values = sample_missing_values[:i] (np.array): Sample with missing values.
-        n (int): The number of values to consider for the expected value.
+        idx_missing (int): The index of the item to be filled.
         epsilon (float, optional): A value to prevent divide by 0. Defaults to 1e-5.
 
     Returns:
-        int: Expected value.
+        float: Expected value.
     """
-    known_values = complete_samples[:,:n]
-    q_prefix = missing_sample[:n]
+    known_values = complete_samples[:,:idx_missing]
+    q_prefix = missing_sample[:idx_missing]
     weights = []
     for xi in known_values:        
         # Calculate the euclidean distance.
@@ -33,10 +33,10 @@ def __expected_value__(complete_samples:np.array, missing_sample:np.array, n:int
         weight = 1 / (distance + epsilon)
         weights.append(weight)
     
-    y = complete_samples[:,n]
+    y = complete_samples[:,idx_missing]
     weights = np.array(weights)    
     #known_values = np.array(known_values)
-    expected = np.sum(weights * y) // np.sum(weights)
+    expected = np.sum(weights * y) / np.sum(weights)
     return expected
 
 def _fill_missing_values(complete_sequences:np.array, sample_missing_values:np.array, len_complete:int):
@@ -51,7 +51,9 @@ def _fill_missing_values(complete_sequences:np.array, sample_missing_values:np.a
         # Calculate the expected value based on the first i values of the sample.        
         expected = __expected_value__(complete_sequences, sample_missing_values, i)
         # Set the expected value to the sample.
-        sample_missing_values[i] = expected
+        sample_missing_values[i] = int(expected)
+    
+    pass
         
 def __generate_data_set(seq_len = 10, n_training_samples = 800):
     #seq_len cannot be less than 2.
@@ -73,7 +75,7 @@ def __generate_data_set(seq_len = 10, n_training_samples = 800):
      
     if len(data_arr) % seq_len != 0:
         #Initialize the last sequence with zeros.
-        last_sequence = np.zeros(seq_len)
+        last_sequence = np.zeros(seq_len, dtype=int)
         #Copy the last part of the data_arr to the last sequence.
         last_sequence[:len(data_arr) % seq_len] = data_arr[-(len(data_arr) % seq_len):]
 
@@ -90,12 +92,12 @@ def __generate_data_set(seq_len = 10, n_training_samples = 800):
     
     return sequences   
     
-test = __generate_data_set(seq_len = 9, n_training_samples = 30)
-print(test)
+# test = __generate_data_set(seq_len = 9, n_training_samples = 30)
+# print(test)
 
 class LaserDataSet(torch.utils.data.Dataset):  
     
-    def __init__(self, X:np.array,y:np.array0):
+    def __init__(self, X:np.array,y:np.array):
         self.__X = X
         self.__y = y
 
