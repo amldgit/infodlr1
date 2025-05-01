@@ -55,7 +55,7 @@ def _fill_missing_values(complete_sequences:np.array, sample_missing_values:np.a
     
     pass
         
-def __generate_data_set(seq_len = 10, n_training_samples = 800):
+def __generate_sequences(seq_len = 10, n_training_samples = 800):
     #seq_len cannot be less than 2.
     if seq_len < 2:
         raise ValueError("seq_len cannot be less than 2.")
@@ -72,8 +72,9 @@ def __generate_data_set(seq_len = 10, n_training_samples = 800):
     n_complete_sequences = len(data_arr) // seq_len
     # Create the sequences
     sequences = np.array([data_arr[i * seq_len:(i + 1) * seq_len] for i in range(n_complete_sequences)])    
-     
-    if len(data_arr) % seq_len != 0:
+    
+    missing_value_count = len(data_arr) % seq_len
+    if missing_value_count != 0:
         #Initialize the last sequence with zeros.
         last_sequence = np.zeros(seq_len, dtype=int)
         #Copy the last part of the data_arr to the last sequence.
@@ -90,21 +91,37 @@ def __generate_data_set(seq_len = 10, n_training_samples = 800):
         _fill_missing_values(complete_sequences=sequences, sample_missing_values=last_sequence, len_complete=n_comp)
         sequences = np.append(sequences, [last_sequence], axis=0)
     
-    return sequences   
+    return sequences,missing_value_count 
+
+def create_data_set(seq_len = 10, n_training_samples = 800) -> 'LaserDataSet':
+    """This function creates the data set for training and testing.
+    It generates the sequences of length seq_len.
+    Args:
+        seq_len (int): The length of the sequences. Defaults to 10.
+        n_training_samples (int): The number of training samples. Defaults to 800.
+    """
+    #Generate the sequences
+    sequences, missing_value_count = __generate_sequences(seq_len, n_training_samples)
     
+    #Split the sequences into X and y
+    X = sequences[:,:-1]
+    y = sequences[:,-1]
+    
+    return LaserDataSet(X, y)
+
 # test = __generate_data_set(seq_len = 9, n_training_samples = 30)
 # print(test)
 
 class LaserDataSet(torch.utils.data.Dataset):  
     
     def __init__(self, X:np.array,y:np.array):
-        self.__X = X
-        self.__y = y
+        self.original_X = X
+        self.original_y = y
 
     def __len__(self):
         return len(self.data) - self.K
 
     def __getitem__(self, idx):
-        x = self.__X[idx]
-        y = self.__y[idx]
+        x = self.original_X[idx]
+        y = self.original_y[idx]
         return x, y
