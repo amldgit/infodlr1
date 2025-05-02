@@ -55,14 +55,7 @@ def _fill_missing_values(complete_sequences:np.array, sample_missing_values:np.a
     
     pass
         
-def __generate_sequences(seq_len = 10, n_training_samples = 800, estimate_missing = False) -> tuple:
-    #seq_len cannot be less than 2.
-    if seq_len < 2:
-        raise ValueError("seq_len cannot be less than 2.")
-    
-    #This is a one dimensional array, that holds the values of the only column in the data frame.
-    #Take the n_training_samples.
-    data_arr = np.array(__df__[0].values)[0:n_training_samples]
+def __generate_sequences__( data_arr:np.array, seq_len = 10, estimate_missing = False) -> tuple:    
     
     #The data_arr is a single sequence of numbers. We need to split it into K number of sequences.
     #The first K-1 numbers will be the input and the K number will be the label. 
@@ -98,7 +91,17 @@ def __generate_sequences(seq_len = 10, n_training_samples = 800, estimate_missin
     
     return sequences,missing_value_count 
 
-def create_data_set(seq_len = 10, n_training_samples = 800, estimate_missing = False) -> 'LaserDataSet':
+def __generate_sequences(seq_len = 10, n_training_samples = 800, estimate_missing = False) -> tuple:
+    #seq_len cannot be less than 2.
+    if seq_len < 2:
+        raise ValueError("seq_len cannot be less than 2.")
+    
+    #This is a one dimensional array, that holds the values of the only column in the data frame.
+    #Take the n_training_samples.
+    data_arr = np.array(__df__[0].values)[0:n_training_samples]    
+    return __generate_sequences__(data_arr, seq_len, estimate_missing)
+
+def create_training_set(seq_len = 10, n_training_samples = 800, estimate_missing = False) -> 'LaserDataSet':
     """This function creates the data set for training and testing.
     It generates the sequences of length seq_len.
     Args:
@@ -114,6 +117,23 @@ def create_data_set(seq_len = 10, n_training_samples = 800, estimate_missing = F
     
     return LaserDataSet(X, y)
 
+def create_test_set(seq_len = 10, n_test_samples = 200, estimate_missing = False) -> 'LaserDataSet':
+    """This function creates the data set for testing. It takes the last n_test_samples from the data.
+    It generates the sequences of length seq_len.
+    Args:
+        seq_len (int): The length of the sequences. Defaults to 10.
+        n_test_samples (int): The number of training samples. Defaults to 200.
+    """
+    #Extract the last n_test_samples from the data frame.
+    data_arr = np.array(__df__[0].values)[-n_test_samples:]
+    #Generate the sequences
+    sequences, _ = __generate_sequences__(data_arr, seq_len, estimate_missing)
+    
+    #Split the sequences into X and y
+    X = sequences[:,:-1]
+    y = sequences[:,-1]
+    
+    return LaserDataSet(X, y)
 # test = __generate_data_set(seq_len = 9, n_training_samples = 30)
 # print(test)
 
@@ -125,9 +145,9 @@ class LaserDataSet(torch.utils.data.Dataset):
         self.past_steps = X.shape[1]
 
     def __len__(self):
-        return len(self.data) - self.K
+        return len(self.original_X)
 
     def __getitem__(self, idx):
-        x = self.original_X[idx]
-        y = self.original_y[idx]
+        x = torch.tensor(self.original_X[idx], dtype=torch.uint8)
+        y = torch.tensor(self.original_y[idx], dtype=torch.uint8)
         return x, y

@@ -48,19 +48,37 @@ def test_fill_missing_values():
    assert np.array_equal(sequences[3], expected_last), f"Expected {expected_last}, but got {sequences[3]}"
    pass
    
-def test_create_data_set():
-   
-   expected_y = np.array([138,  58,  20,  92])
-   expected_X = np.array([[ 86, 141,  95,  41,  22,  21,  32,  72],
-       [111,  48,  23,  19,  27,  59, 129, 129],
-       [ 27,  19,  24,  46, 112, 144,  73,  30],
-       [ 19,  37,  0,  0,  0,  0,  0,  0]])
-   
-   #This is the expected data set, tuples of (X, y)
-   expected_dataset = list(zip(expected_X, expected_y))
-   laser_dataset = dtu.create_data_set(seq_len = 9, n_training_samples = 30)
-   for i in range(len(expected_dataset)):
-      e_item = expected_dataset[i]
-      item = laser_dataset[i]      
-      assert np.array_equal(e_item[0], item[0]), f"Expected {e_item[0]}, but got {item[0]}"
-      assert e_item[1] == item[1], f"Expected {e_item[1]}, but got {item[1]}"
+def test_create_data_set():   
+    expected_X = np.array([[ 86, 141,  95,  41,  22,  21,  32,  72],[111,  48,  23,  19,  27,  59, 129, 129],[ 27,  19,  24,  46, 112, 144,  73,  30],[ 19,  37,  0,  0,  0,  0,  0,  0]])
+    expected_y = np.array([138,  58,  20,  92])   
+    #This is the expected data set, tuples of (X, y)
+    expected_dataset = list(zip(expected_X, expected_y))
+    laser_dataset = dtu.create_training_set(seq_len = 9, n_training_samples = 30)
+    ln_datasetr = len(laser_dataset)
+    assert len(laser_dataset) == len(expected_dataset), f"Expected {len(expected_dataset)} items, but got {ln_datasetr}"
+    for i in range(len(expected_dataset)):
+        e_item = expected_dataset[i]
+        item = laser_dataset[i]      
+        assert np.array_equal(e_item[0], item[0]), f"Expected {e_item[0]}, but got {item[0]}"
+        assert e_item[1] == item[1], f"Expected {e_item[1]}, but got {item[1]}"
+    
+    #Make sure the dataset can be used with DataLoader.
+    loader = torch.utils.data.DataLoader(laser_dataset, batch_size=10, shuffle=True, num_workers=0)
+    cnt = 0
+    for i, (inputs, targets) in enumerate(loader):
+        #Check the shape of the inputs and targets
+        assert inputs.shape == (4, 8), f"Expected input shape (10, 8), but got {inputs.shape}"
+        assert targets.shape == (4,), f"Expected target shape (10,), but got {targets.shape}"
+        cnt += 1
+        
+    assert cnt == 1, f"Expected 1 batch, but got {cnt}"
+    
+def test_create_test_set():
+    test_set = dtu.create_test_set(seq_len = 10, n_test_samples=200)
+    assert len(test_set) == 20, f"Expected 20 samples, but got {len(test_set)}"
+    #Make sure that each item has 10 values, first (input) 9, second (labels) 1.
+    for i in range(len(test_set)):
+        item = test_set[i]
+        assert len(item[0]) == 9, f"Expected 9 values, but got {len(item[0])}"
+        #This is just a single value, so it should be 0-dimensional.
+        assert item[1].ndim == 0, f"Expected dimension 0 value, but got {item[1].ndim}"
