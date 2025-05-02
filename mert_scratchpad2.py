@@ -1,7 +1,7 @@
 
 # %%
 import torch
-import a_mert_data as dtu
+import mert_data as dtu
 
 #This is the .mat file as data frame.
 X_train_df = dtu.__df__

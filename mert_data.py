@@ -55,7 +55,7 @@ def _fill_missing_values(complete_sequences:np.array, sample_missing_values:np.a
     
     pass
         
-def __generate_sequences(seq_len = 10, n_training_samples = 800):
+def __generate_sequences(seq_len = 10, n_training_samples = 800, estimate_missing = False) -> tuple:
     #seq_len cannot be less than 2.
     if seq_len < 2:
         raise ValueError("seq_len cannot be less than 2.")
@@ -88,12 +88,17 @@ def __generate_sequences(seq_len = 10, n_training_samples = 800):
         n_comp = idx_non_z + 1
         
         #we need to calculate the expected value of the label, based on the first non-zero values of all items in the sequence.
-        _fill_missing_values(complete_sequences=sequences, sample_missing_values=last_sequence, len_complete=n_comp)
+        if estimate_missing:
+            _fill_missing_values(complete_sequences=sequences, sample_missing_values=last_sequence, len_complete=n_comp)
+        else:
+            #assign the last non-zero value to the label and switch.
+            last_sequence[-1] = last_sequence[idx_non_z]
+            last_sequence[idx_non_z] = 0
         sequences = np.append(sequences, [last_sequence], axis=0)
     
     return sequences,missing_value_count 
 
-def create_data_set(seq_len = 10, n_training_samples = 800) -> 'LaserDataSet':
+def create_data_set(seq_len = 10, n_training_samples = 800, estimate_missing = False) -> 'LaserDataSet':
     """This function creates the data set for training and testing.
     It generates the sequences of length seq_len.
     Args:
@@ -101,7 +106,7 @@ def create_data_set(seq_len = 10, n_training_samples = 800) -> 'LaserDataSet':
         n_training_samples (int): The number of training samples. Defaults to 800.
     """
     #Generate the sequences
-    sequences, missing_value_count = __generate_sequences(seq_len, n_training_samples)
+    sequences, _ = __generate_sequences(seq_len, n_training_samples, estimate_missing)
     
     #Split the sequences into X and y
     X = sequences[:,:-1]
@@ -117,6 +122,7 @@ class LaserDataSet(torch.utils.data.Dataset):
     def __init__(self, X:np.array,y:np.array):
         self.original_X = X
         self.original_y = y
+        self.past_steps = X.shape[1]
 
     def __len__(self):
         return len(self.data) - self.K

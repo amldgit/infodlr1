@@ -1,4 +1,4 @@
-import a_mert_data as dtu
+import mert_data as dtu
 import numpy as np
 import torch
 
@@ -32,7 +32,7 @@ def test_missing_data_handling_expectation():
     assert expected_value == 37.118, f"Expected value is {expected_value}, but it should be 37.0"
     
 def test_fill_missing_values():
-   sequences, missing_value_count = dtu.__generate_sequences(seq_len = 9, n_training_samples = 30)
+   sequences, missing_value_count = dtu.__generate_sequences(seq_len = 9, n_training_samples = 30, estimate_missing=True)
    assert len(sequences) == 4, f"Expected 4 sequences, but got {len(sequences)}"
    
    #The last sequence is not complete and needs to be filled with the expected value.
@@ -40,15 +40,21 @@ def test_fill_missing_values():
    assert 37 == sequences[3][3], f"Expected 37, but got {sequences[3][3]}"
    # Make sure none of the values are zero.
    assert np.all(sequences[3] != 0), f"Expected all values to be non-zero, but got {sequences[3]}"
+   
+   #Test with estimate_missing = False
+   sequences, missing_value_count = dtu.__generate_sequences(seq_len = 9, n_training_samples = 30, estimate_missing=False)
+   assert len(sequences) == 4, f"Expected 4 sequences, but got {len(sequences)}"
+   expected_last = np.array([19, 37,  0,  0,  0,  0,  0,  0, 92])
+   assert np.array_equal(sequences[3], expected_last), f"Expected {expected_last}, but got {sequences[3]}"
    pass
    
 def test_create_data_set():
    
-   expected_y = np.array([138,  58,  20,  66])
+   expected_y = np.array([138,  58,  20,  92])
    expected_X = np.array([[ 86, 141,  95,  41,  22,  21,  32,  72],
        [111,  48,  23,  19,  27,  59, 129, 129],
        [ 27,  19,  24,  46, 112, 144,  73,  30],
-       [ 19,  37,  92,  37,  64,  84,  79,  72]])
+       [ 19,  37,  0,  0,  0,  0,  0,  0]])
    
    #This is the expected data set, tuples of (X, y)
    expected_dataset = list(zip(expected_X, expected_y))
