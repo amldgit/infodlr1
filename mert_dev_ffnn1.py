@@ -9,13 +9,12 @@ window_size = 20
 epochs = 100
     
 model = FNN(input_size=window_size, hidden_size=32, hidden_layers=3)
+model.optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+#scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
+model.loss_fn = nn.MSELoss()
 print(model)
 
-loss_fn = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-#scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
-
-final_test_loss, y_test_np, predictions_np = model.perform_training_no_batch(loss_fn, optimizer, epochs=epochs, train_size=800, sequence_len=window_size, normalize=True)
+final_test_loss, y_test_np, predictions_np = model.perform_training_no_batch(epochs=epochs, train_size=800, sequence_len=window_size, normalize=True)
 train_losses = np.array(model.train_losses)
 test_losses = np.array(model.test_losses)
 
