@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import mert_data as dt
 from mert_data import laser_dataset
+from mert_fnn import FNN
 
 window_size = 5
 X_train, y_train, X_test, y_test = dt.split_data(train_size=800, sequence_len=window_size, normalize=True)
@@ -13,20 +14,7 @@ y_train = laser_dataset(y_train, y_train)
 X_test = laser_dataset(X_test, y_test)
 y_test = laser_dataset(y_test, y_test)
 
-class FNN(nn.Module):
-    def __init__(self, input_size, hidden_size=32):
-        super(FNN, self).__init__()
-        self.layers = nn.Sequential(
-        nn.Linear(input_size, hidden_size),
-            nn.ReLU(),
-            # nn.Linear(hidden_size, hidden_size//2),
-            # nn.ReLU(),            
-            nn.Linear(hidden_size, 1))
-    
-    def forward(self, x):
-        return self.layers(x)
-    
-model = FNN(input_size=window_size, hidden_size=64)
+model = FNN(input_size=window_size, hidden_size=32, hidden_layers=3)
 print(model)
 
 criterion = nn.MSELoss()

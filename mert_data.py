@@ -20,8 +20,6 @@ class laser_dataset(torch.utils.data.Dataset):
 
 # Create sequences
 def create_sequences(data, sequence_len):
-    
-    
     X, y = [], []
     for i in range(len(data) - sequence_len):
         X.append(data[i:i+sequence_len,0])
