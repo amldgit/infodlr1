@@ -1,54 +1,60 @@
 import numpy as np
 import pandas as pd
 import scipy.io
+from sklearn.preprocessing import MinMaxScaler
 import torch
 
-#The data is in a .mat file. Load it using scipy.io
-__mat_data__ = scipy.io.loadmat('Xtrain.mat')
-# Convert to DataFrame, there is only one variable in the .mat file
-__df__ = pd.DataFrame(__mat_data__['Xtrain']) 
-
-import numpy as np
-
-def generate_sequences(data_arr:np.array, row_len = 10, sliding_step=1, discard_last_zero=True) -> tuple:
+class laser_dataset(torch.utils.data.Dataset):  
     
-    #12345 12-3 23-4 34-5
-    #Create a sliding window of size row_len, with a step of sliding_step. The last row will be padded with zeros.
-    #Each row will be a sequence of length row_len, and the last element will be the target.
-    sequences = []
-    targets = []
-    for i in range(0, len(data_arr) - row_len + 1, sliding_step):
-        seq = data_arr[i:i + row_len]
-        target = data_arr[i + row_len] if i + row_len < len(data_arr) else 0
-        sequences.append(seq)
-        targets.append(target)
-
-    #If discard_last_zero is True, discard the last row last label is 0. 
-    if discard_last_zero:
-        sequences = [seq for seq, target in zip(sequences, targets) if target != 0]
-        targets = [target for target in targets if target != 0]
-    return np.array(sequences), np.array(targets)
-
-class LaserDataSet(torch.utils.data.Dataset):  
-    
-    def __init__(self, data, seq_length=10):
-        self.data = torch.tensor(data, dtype=torch.float32)
-        self.seq_length = seq_length
+    def __init__(self, X,y):
+        self.X = X
+        self.y = y        
 
     def __len__(self):
-        return len(self.data) - self.seq_length
+        return len(self.X)
 
     def __getitem__(self, idx):
-        x = self.data[idx:idx+self.seq_length].squeeze(-1)
-        y = self.data[idx+self.seq_length].unsqueeze(1)
+        x = self.X[idx]
+        y = self.y[idx]
         return x, y 
 
-def create_data_sets(n_training_samples = 800, seq_len = 10, discard_missing_last = True) -> LaserDataSet:
-    data_arr = __df__.to_numpy()
-    #data_arr = data_arr/255.0  # Normalize to [0, 1]
-    training_data = data_arr[:n_training_samples]
-    test_data = data_arr[n_training_samples:]
+# Create sequences
+def create_sequences(data, sequence_len):
     
-    training = LaserDataSet(training_data, seq_length=seq_len)
-    test = LaserDataSet(test_data, seq_length=seq_len)
-    return training, test
+    
+    X, y = [], []
+    for i in range(len(data) - sequence_len):
+        X.append(data[i:i+sequence_len,0])
+        y.append(data[i+sequence_len,0])
+    return np.array(X), np.array(y)
+
+def split_data(train_size=800, sequence_len=5, normalize=True):
+    """
+    Loads Xtrain.mat and splits the data into training and testing sets.
+    
+    Parameters:    
+    - train_size: The number of samples to use for training.
+    - sequence_len: The length of the sequences to create.
+    
+    Returns:
+    - X_train, y_train: Training data and labels.
+    - X_test, y_test: Testing data and labels.
+    """    
+    
+    #The data is in a .mat file. Load it using scipy.io
+    __mat_data__ = scipy.io.loadmat('Xtrain.mat')
+    # Convert to DataFrame, there is only one variable in the .mat file
+    __df__ = pd.DataFrame(__mat_data__['Xtrain']) 
+    # Your raw data, assume normalized or scaled to [0, 1]
+    data = np.array(__df__.to_numpy(), dtype=np.float32)  # shape (1000,)
+    
+    if normalize:
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        data = scaler.fit_transform(data)
+        #data = data / 255.0  # Normalize to [0, 1]
+    
+    train, test = data[0:train_size], data[train_size:len(data)]
+    X_train, y_train = create_sequences(train, sequence_len)
+    X_test, y_test = create_sequences(test, sequence_len)    
+    return X_train, y_train, X_test, y_test
+
