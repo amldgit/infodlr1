@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from mert_fnn import FNN
 import torch.nn as nn
 
-window_size = 20
+window_size = 10
 batch_size = -1
 epochs = 100
 hidden_layers = 3
@@ -18,18 +18,20 @@ model.optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 model.loss_fn = nn.MSELoss()
 print(model)
 
-model.perform_training(epochs=epochs, train_size=800, sequence_len=window_size,batch_size=batch_size, shuffle=shuffle)
+model.perform_training(epochs=epochs, train_size=-1, sequence_len=window_size,batch_size=batch_size, shuffle=shuffle)
 results = model.get_descaled_results()
 train_losses = np.array(results["train_losses"])
-test_losses = np.array(results["test_losses"])
-predictions = np.array(results["predictions"])
-actual = np.array(results["actual"])
+#test_losses = np.array(results["test_losses"])
+#predictions = np.array(results["predictions"])
+#actual = np.array(results["actual"])
+print("Final train loss: ", results["train_score"])
+#print("Final test loss: ", results["test_score"])
 
 # Plot training and test losses
 num_epochs = len(train_losses)
 plt.figure(figsize=(10, 6))
 plt.plot(range(1, num_epochs + 1), train_losses, label='Training Loss')
-plt.plot(range(1, num_epochs + 1), test_losses, label='Test Loss')
+#plt.plot(range(1, num_epochs + 1), test_losses, label='Test Loss')
 
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
@@ -38,9 +40,8 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-plt.plot(predictions, label='Predicted')
-plt.plot(actual, label='Actual')
-plt.legend()
-plt.show()
+# plt.plot(predictions, label='Predicted')
+# plt.plot(actual, label='Actual')
+# plt.legend()
+# plt.show()
 
-pass

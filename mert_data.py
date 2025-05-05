@@ -37,12 +37,12 @@ def create_sequences(data:np.array, sequence_len:int) -> tuple:
     return np.array(X), np.array(y)
 
 scaler = MinMaxScaler(feature_range=(0, 1))
-def split_data(train_size=800, sequence_len=5, scale=True)->tuple:
+def split_data(train_size=-1, sequence_len=5, scale=True)->tuple:
     """
     Loads Xtrain.mat and splits the data into training and testing sets.
     
     Parameters:    
-    - train_size: The number of samples to use for training.
+    - train_size: The number of samples to use for training. If -1, all data will be used for training.
     - sequence_len: This is the number of time steps to look back.
     - scale: Whether to scale the data using MinMaxScaler.
     
@@ -61,8 +61,12 @@ def split_data(train_size=800, sequence_len=5, scale=True)->tuple:
         data = scaler.fit_transform(data)
         #data = data / 255.0  # Normalize to [0, 1]
     
+    if train_size == -1:
+        train_size = len(data)
+    
     train, test = data[0:train_size], data[train_size:len(data)]
-    X_train, y_train = create_sequences(train, sequence_len)
+    X_train, y_train = create_sequences(train, sequence_len)   
+    
     X_test, y_test = create_sequences(test, sequence_len)    
     return X_train, y_train, X_test, y_test
 
@@ -77,6 +81,9 @@ def descale(data)->np.array:
     - The inverse transformed data.
     """
     
+    if data == np.inf or data == -np.inf or data == np.nan:
+        return data
+    
     if not isinstance(data, np.ndarray):
         data = np.array(data)
     
@@ -87,5 +94,8 @@ def descale(data)->np.array:
     # Check if data is 1D and reshape it to 2D
     if data.ndim == 1:
         data = data.reshape(-1, 1)
-        
+    
+    if len(data) == 0:
+        return data
+    
     return scaler.inverse_transform(data)
