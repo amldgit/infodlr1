@@ -10,6 +10,10 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 import pandas as pd
 
+#This code is mainly copied from 
+#https://github.com/bnsreenu/python_for_microscopists/blob/master/164a-Intro_to_time_series_Forecasting_using_feed_forward_NN.py
+#This is only for comparison with out own implementation of FNN in PyTorch.
+
 #The data is in a .mat file. Load it using scipy.io
 __mat_data__ = scipy.io.loadmat('Xtrain.mat')
 # Convert to DataFrame, there is only one variable in the .mat file

@@ -35,7 +35,7 @@ plt.plot(range(1, num_epochs + 1), train_losses, label='Training Loss')
 
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
-plt.title('Training and Test Losses Over Time')
+plt.title('Training Losses Over Time')
 plt.legend()
 plt.grid(True)
 plt.show()

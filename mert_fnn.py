@@ -179,3 +179,17 @@ class FNN(nn.Module):
             predictions = self(X)
             train_score = self.loss_fn(predictions, torch.tensor(actual_labels).unsqueeze(1))
             return train_score, predictions.numpy()
+        
+    def __recursive_prediction(self, initial_window, num_steps=200):        
+        preds = []
+        input_seq = initial_window.clone().detach().float().unsqueeze(0)  # shape (1, window_size)
+
+        with torch.no_grad():
+            for _ in range(num_steps):
+                next_pred = self(input_seq)             # shape (1, 1)
+                preds.append(next_pred.item())           # store scalar value
+
+                # Update input sequence: drop oldest, append new prediction
+                input_seq = torch.cat([input_seq[:, 1:], next_pred], dim=1)  # still shape (1, window_size)
+
+        return preds
