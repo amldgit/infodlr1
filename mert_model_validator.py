@@ -35,6 +35,9 @@ print(f"Total combinations to test: {len(all_combinations)}")
 # %%
 cnt = len(all_combinations)
 current_combination = 0
+best_combination = None
+best_loss = float('inf')
+
 for params in all_combinations:    
     current_combination += 1
     print(f"Combination {current_combination} of {cnt}")    
@@ -59,6 +62,11 @@ for params in all_combinations:
     test_losses = np.array(results["test_losses"])
     predictions = np.array(results["predictions"])
     actual = np.array(results["actual"])
+    min_loss = min(test_losses)
+    if min_loss < best_loss:
+        best_loss = min_loss
+        best_combination = params.copy()
+        print(f"New best combination: {best_combination} with loss: {best_loss}")
     
     full_data = dt.get_dataset(scale=True)
     # Get the last window from the dataset
@@ -120,4 +128,5 @@ for params in all_combinations:
     # Adjust layout to prevent overlap
     plt.tight_layout()
     #plt.show()
-# %%
+
+print(f"Best combination: {best_combination} with loss: {best_loss}")

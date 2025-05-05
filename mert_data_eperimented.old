@@ -37,36 +37,30 @@ def create_sequences(data:np.array, sequence_len:int) -> tuple:
     return np.array(X), np.array(y)
 
 scaler = MinMaxScaler(feature_range=(0, 1))
-def get_dataset(scale=True)->np.array:
+def preprocess(sequence_len=5, scale=True)->tuple:
+    """
+    Loads Xtrain.mat and splits the data into training and testing sets.
+    
+    Parameters:    
+    - sequence_len: This is the number of time steps to look back.
+    - scale: Whether to scale the data using MinMaxScaler.
+    
+    Returns:
+    - X, y: data, labels.   
+    """    
+    
     #The data is in a .mat file. Load it using scipy.io
     __mat_data__ = scipy.io.loadmat('Xtrain.mat')
     # Convert to DataFrame, there is only one variable in the .mat file
     __df__ = pd.DataFrame(__mat_data__['Xtrain']) 
     # Your raw data, assume normalized or scaled to [0, 1]
     data = np.array(__df__.to_numpy(), dtype=np.float32)  # shape (1000,)
-    if scale:
-        scaler.fit(data)
-        data = scaler.transform(data)
-    return data
     
-def split_data(train_size=800, sequence_len=5, scale=True)->tuple:
-    """
-    Loads Xtrain.mat and splits the data into training and testing sets.
+    if scale:        
+        data = scaler.fit_transform(data)
     
-    Parameters:    
-    - train_size: The number of samples to use for training.
-    - sequence_len: This is the number of time steps to look back.
-    - scale: Whether to scale the data using MinMaxScaler.
-    
-    Returns:
-    - X_train, y_train, X_test, y_test: Training data, training labels, test data, test labels.   
-    """        
-    # Your raw data, assume normalized or scaled to [0, 1]
-    data = get_dataset(scale=scale)    
-    train, test = data[0:train_size], data[train_size:len(data)]
-    X_train, y_train = create_sequences(train, sequence_len)
-    X_test, y_test = create_sequences(test, sequence_len)    
-    return X_train, y_train, X_test, y_test
+    X_train, y_train = create_sequences(data, sequence_len)       
+    return X_train, y_train
 
 def descale(data)->np.array:
     """
@@ -79,6 +73,12 @@ def descale(data)->np.array:
     - The inverse transformed data.
     """
     
+    if isinstance(data, np.ndarray) and len(data) == 0 or data is None:
+        return data       
+     
+    if isinstance(data, float) and (data == np.inf or data == -np.inf or data == np.nan):
+        return data
+    
     if not isinstance(data, np.ndarray):
         data = np.array(data)
     
@@ -89,5 +89,8 @@ def descale(data)->np.array:
     # Check if data is 1D and reshape it to 2D
     if data.ndim == 1:
         data = data.reshape(-1, 1)
-        
+    
+    if len(data) == 0:
+        return data
+    
     return scaler.inverse_transform(data)
