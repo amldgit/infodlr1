@@ -4,6 +4,9 @@ import torch.nn as nn
 import mert_data as dt
 
 class FNN(nn.Module):
+    path_best = 'fnn_best_model.pt'    
+    results = {}
+        
     def __init__(self, input_size, hidden_size=32, hidden_layers=1):
         super(FNN, self).__init__()        
         
@@ -38,126 +41,106 @@ class FNN(nn.Module):
         self.layers = nn.Sequential(*layers)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.loss_fn = nn.MSELoss()
+        self.reset_results()
     
     def forward(self, x):
-        return self.layers(x)    
+        return self.layers(x)        
     
-    path_best = 'fnn_best_model.pt'
-    train_losses = []
-    test_losses = []
-    best_loss = np.inf
-    best_epoch = 0
-    final_test_loss = np.inf
+    def reset_results(self):
+        self.results = {"train_losses": [], "test_losses": [], "best_loss": np.inf, "best_epoch": 0,"predictions":[], "actual":[] ,"final_test_loss": np.inf}        
     
-    def perform_training_no_batch(self,epochs=100, train_size=800, sequence_len=5, normalize=True):    
-        X_train, y_train, X_test, y_test = dt.split_data(train_size=train_size, sequence_len=sequence_len, normalize=normalize) 
-           
-        # Convert to PyTorch tensors
-        X_train = torch.tensor(X_train) # shape (N, window_size)
-        y_train = torch.tensor(y_train)
-        X_test = torch.tensor(X_test)
-        y_test = torch.tensor(y_test)
+    def get_descaled_results(self, copy=True):
+        """Returns the results of the training and test losses, predictions and actual values scaled to the original range.
+        Args:
+            copy (bool, optional): If True, returns a copy of the results. Defaults to True.
+        Returns:
+            dict: A dictionary containing the descaled results.
+        """
         
+        if copy:
+            #copy the results
+            results = self.results.copy()
+        else:
+            results = self.results
+            
+        keys_to_descale = ["train_losses", "test_losses","predictions", "actual", "final_test_loss"]
+        for key in keys_to_descale:
+            if key in results:
+                results[key] = dt.descale(results[key])
+        return results
+    
+    def perform_training(self,epochs=100, train_size=800, sequence_len=5,batch_size=32, shuffle=True):
+        """_summary_
+
+        Args:
+            epochs (int, optional): Epoch max. limit. Defaults to 100.
+            train_size (int, optional): Number of samples in the training dataset. Defaults to 800.
+            sequence_len (int, optional): Length of 'memory'. This is the feature size and tells the model how many data points it should look back. Defaults to 5.
+            batch_size (int, optional): Number of input batches for optimization. If <= 0, training will run in one single batch. Defaults to 32.
+            shuffle (bool, optional): Shuffles the training data. Defaults to True.
+        """
+        X_train, y_train, X_test, y_test = dt.split_data(train_size=train_size, sequence_len=sequence_len, scale=True)          
+        X_Train = dt.laser_dataset(X_train, y_train)
+        y_train = dt.laser_dataset(y_train, y_train)
+        X_test = dt.laser_dataset(X_test, y_test)
+        y_test = dt.laser_dataset(y_test, y_test)
+        
+        if batch_size <= 0:
+            batch_size = len(X_Train) # Train the entire dataset in one batch
+            
+        # Training loop
         for epoch in range(epochs):
             self.train()
-            self.optimizer.zero_grad()
-            output = self(X_train)
-            loss = self.loss_fn(output, y_train.unsqueeze(1))
-            loss.backward()
-            self.optimizer.step()
-                    
-            # Store the training loss
-            self.train_losses.append(loss.item())
+            train_loss = 0.0
             
-            # Test the model for epoch
+            # Training step
+            train_loader = torch.utils.data.DataLoader(X_Train, batch_size=batch_size, shuffle=shuffle)
+            for inputs, targets in train_loader:
+                self.optimizer.zero_grad()
+                outputs = self(inputs)
+                loss = self.loss_fn(outputs, targets.unsqueeze(1))
+                loss.backward()
+                self.optimizer.step()
+                train_loss += loss.item()
+            
+            # Calculate average training loss and strore it
+            train_loss = train_loss / len(X_Train)                
+            self.results["train_losses"].append(train_loss)
+            
+            # Validation step
             self.eval()
+            test_loss = 0.0
             with torch.no_grad():
-                test_output = self(X_test)
-                test_loss = self.loss_fn(test_output, y_test.unsqueeze(1))
-                self.test_losses.append(test_loss.item())                
+                for inputs, targets in torch.utils.data.DataLoader(X_test, batch_size=batch_size):
+                    outputs = self(inputs.float())
+                    test_loss += self.loss_fn(outputs, targets.unsqueeze(1)).item()
             
-            if test_loss < self.best_loss:
-                self.best_loss = test_loss
-                self.best_epoch = epoch
-                # Save the model state
-                torch.save(self.state_dict(), self.path_best)
+            test_loss = test_loss / len(X_test)
+            self.results["test_losses"].append(test_loss)
             
-            if (epoch+1) % 10 == 0:
-                print(f"Epoch {epoch+1}, Train Loss: {loss.item():.4f}, Test Loss: {test_loss.item():.4f}")
+            if test_loss < self.results["best_loss"]:
+                self.results["best_loss"] = test_loss
+                self.results["best_epoch"] = epoch
+                save_path = 'fnn_best_model.pt'
+                torch.save(self.state_dict(), save_path)
+            
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch}: Training Loss = {train_loss:.6f}, Test Loss = {test_loss:.6f}')
                 
         #load the best model
         self.load_state_dict(torch.load('fnn_best_model.pt'))
         self.eval()
+        
+        # Make predictions
         with torch.no_grad():
-            predictions = self(X_test)
-            self.final_test_loss = self.loss_fn(predictions, y_test.unsqueeze(1))
-            print(f"Final Test MSE: {self.final_test_loss.item():.4f}")
-
-        # Convert tensors to numpy for plotting
-        y_test_np = y_test.numpy()        
-        predictions_np = predictions.numpy() 
-        return self.final_test_loss, y_test_np, predictions_np
-    
-    def perform_training(self,epochs=100, train_size=800, sequence_len=5, normalize=True,batch_size=32, shuffle=True):    
-            X_train, y_train, X_test, y_test = dt.split_data(train_size=train_size, sequence_len=sequence_len, normalize=normalize)          
-            X_Train = dt.laser_dataset(X_train, y_train)
-            y_train = dt.laser_dataset(y_train, y_train)
-            X_test = dt.laser_dataset(X_test, y_test)
-            y_test = dt.laser_dataset(y_test, y_test)
+            test_loader = torch.utils.data.DataLoader(X_test, batch_size=len(X_test))
+            for inputs, _ in test_loader:
+                predictions = self(inputs.float())
             
-            # Training loop
-            for epoch in range(epochs):
-                self.train()
-                train_loss = 0.0
-                
-                # Training step
-                train_loader = torch.utils.data.DataLoader(X_Train, batch_size=batch_size, shuffle=shuffle)
-                for inputs, targets in train_loader:
-                    self.optimizer.zero_grad()
-                    outputs = self(inputs)
-                    loss = self.loss_fn(outputs, targets.unsqueeze(1))
-                    loss.backward()
-                    self.optimizer.step()
-                    train_loss += loss.item()
-                
-                # Calculate average training loss
-                train_loss = train_loss / len(X_Train)
-                self.train_losses.append(train_loss)
-                
-                # Validation step
-                self.eval()
-                test_loss = 0.0
-                with torch.no_grad():
-                    for inputs, targets in torch.utils.data.DataLoader(X_test, batch_size=batch_size):
-                        outputs = self(inputs.float())
-                        test_loss += self.loss_fn(outputs, targets.unsqueeze(1)).item()
-                
-                test_loss = test_loss / len(X_test)
-                self.test_losses.append(test_loss)
-                
-                if test_loss < self.best_loss:
-                    self.best_loss = test_loss
-                    self.best_epoch = epoch
-                    save_path = 'fnn_best_model.pt'
-                    torch.save(self.state_dict(), save_path)
-                
-                if epoch % 10 == 0:
-                    print(f'Epoch {epoch}: Training Loss = {train_loss:.6f}, Test Loss = {test_loss:.6f}')
-                    
-            #load the best model
-            self.load_state_dict(torch.load('fnn_best_model.pt'))
-            self.eval()
+            final_test_loss = self.loss_fn(predictions, torch.tensor(y_test.y).unsqueeze(1))
+            self.results["final_test_loss"] = final_test_loss.item()
             
-            # Make predictions
-            with torch.no_grad():
-                test_loader = torch.utils.data.DataLoader(X_test, batch_size=len(X_test))
-                for inputs, _ in test_loader:
-                    predictions = self(inputs.float())
-                
-                self.final_test_loss = self.loss_fn(predictions, torch.tensor(y_test.y).unsqueeze(1))
-                predictions_np = predictions.numpy()
-                y_test_np = y_test.y
-                
-            
-            return self.final_test_loss, y_test_np, predictions_np
+            # Convert tensors to numpy for plotting
+            self.results["actual"] = y_test.y     
+            self.results["predictions"] = predictions.numpy() 
             
