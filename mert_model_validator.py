@@ -7,11 +7,12 @@ from mert_fnn import FNN
 import torch.nn as nn
 from itertools import product
 import mert_data as dt
+import pandas as pd
 
-window_sizes = [8, 16, 32]
+window_sizes = [10, 16, 20]
 batch_sizes = [16, 32, 64]
-epoch_runs = [100, 250, 200]
-hidden_layers = [1, 2, 3, 4]
+epoch_runs = [150]
+hidden_layers = [2, 3, 4]
 hidden_sizes = [16, 32, 64]
 #learning_rates = [0.001, 0.01, 0.1]
 shuffles = [True, False]
@@ -37,6 +38,8 @@ cnt = len(all_combinations)
 current_combination = 0
 best_combination = None
 best_loss = float('inf')
+
+results_data = []
 
 for params in all_combinations:    
     current_combination += 1
@@ -68,6 +71,9 @@ for params in all_combinations:
         best_combination = params.copy()
         print(f"New best combination: {best_combination} with loss: {best_loss}")
     
+    # Store the results in the DataFrame
+    results_data.append([window_size, batch_size, epochs, hidden_layers, hidden_size, shuffle, min_loss, np.mean(test_losses), np.mean(train_losses)])
+    
     full_data = dt.get_dataset(scale=True)
     # Get the last window from the dataset
     last_window = full_data[-window_size:]
@@ -97,9 +103,11 @@ for params in all_combinations:
     num_epochs = len(train_losses)
     # Create a figure with 2 rows, first row has 2 columns
     fig = plt.figure(figsize=(15, 10))
-    # Add text for parameters and best loss at the top of the figure
-    plt.figtext(0.02, 1.05, f'Parameters: {params}', fontsize=10, ha='left')
-    plt.figtext(0.02, 1.02, f'Best test loss: {min(test_losses)}', fontsize=10, ha='left')
+    # Add text for parameters and best loss at the bottom of the figure, with more space and lower position
+    plt.figtext(0.02, -0.1, f'Parameters: {params}', fontsize=10, ha='left')
+    plt.figtext(0.02, -0.15, f'Best test loss: {min(test_losses)}', fontsize=10, ha='left')
+    # Adjust subplot parameters to make room for the text
+    plt.subplots_adjust(bottom=0.2)
     
     # First plot (Training and Test Losses)
     plt.subplot(2, 2, 1)
@@ -130,3 +138,18 @@ for params in all_combinations:
     #plt.show()
 
 print(f"Best combination: {best_combination} with loss: {best_loss}")
+# Create DataFrame with columns for parameters and results
+results_df = pd.DataFrame(columns=[
+    'window_size', 'batch_size', 'epochs', 'hidden_layers', 
+    'hidden_size', 'shuffle', 'best_loss', 'avg_test_loss', 'avg_train_loss'
+], data=results_data)
+#sort the DataFrame by best_loss
+results_df = results_df.sort_values(by='best_loss')
+# Save the DataFrame to a CSV file
+results_df.to_csv('model_results.csv', index=False)
+# display the DataFrame as a table
+from IPython.display import display
+display(results_df)
+#Best combination: {'window_size': 16, 'batch_size': 64, 'epochs': 250, 'hidden_layers': 4, 'hidden_size': 64, 'shuffle': True} with loss: [2.00009061]
+
+# %%
