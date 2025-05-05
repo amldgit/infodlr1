@@ -37,6 +37,18 @@ def create_sequences(data:np.array, sequence_len:int) -> tuple:
     return np.array(X), np.array(y)
 
 scaler = MinMaxScaler(feature_range=(0, 1))
+def get_dataset(scale=True)->np.array:
+    #The data is in a .mat file. Load it using scipy.io
+    __mat_data__ = scipy.io.loadmat('Xtrain.mat')
+    # Convert to DataFrame, there is only one variable in the .mat file
+    __df__ = pd.DataFrame(__mat_data__['Xtrain']) 
+    # Your raw data, assume normalized or scaled to [0, 1]
+    data = np.array(__df__.to_numpy(), dtype=np.float32)  # shape (1000,)
+    if scale:
+        scaler.fit(data)
+        data = scaler.transform(data)
+    return data
+    
 def split_data(train_size=800, sequence_len=5, scale=True)->tuple:
     """
     Loads Xtrain.mat and splits the data into training and testing sets.
@@ -48,19 +60,9 @@ def split_data(train_size=800, sequence_len=5, scale=True)->tuple:
     
     Returns:
     - X_train, y_train, X_test, y_test: Training data, training labels, test data, test labels.   
-    """    
-    
-    #The data is in a .mat file. Load it using scipy.io
-    __mat_data__ = scipy.io.loadmat('Xtrain.mat')
-    # Convert to DataFrame, there is only one variable in the .mat file
-    __df__ = pd.DataFrame(__mat_data__['Xtrain']) 
+    """        
     # Your raw data, assume normalized or scaled to [0, 1]
-    data = np.array(__df__.to_numpy(), dtype=np.float32)  # shape (1000,)
-    
-    if scale:        
-        data = scaler.fit_transform(data)
-        #data = data / 255.0  # Normalize to [0, 1]
-    
+    data = get_dataset(scale=scale)    
     train, test = data[0:train_size], data[train_size:len(data)]
     X_train, y_train = create_sequences(train, sequence_len)
     X_test, y_test = create_sequences(test, sequence_len)    

@@ -6,6 +6,7 @@ import mert_data as dt
 class FNN(nn.Module):
     path_best = 'fnn_best_model.pt'    
     results = {}
+    report = True
         
     def __init__(self, input_size, hidden_size=32, hidden_layers=1):
         super(FNN, self).__init__()        
@@ -124,7 +125,7 @@ class FNN(nn.Module):
                 save_path = 'fnn_best_model.pt'
                 torch.save(self.state_dict(), save_path)
             
-            if epoch % 10 == 0:
+            if self.report and epoch % 10 == 0:
                 print(f'Epoch {epoch}: Training Loss = {train_loss:.6f}, Test Loss = {test_loss:.6f}')
                 
         #load the best model
