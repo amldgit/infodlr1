@@ -42,6 +42,7 @@ class FNN(nn.Module):
         self.layers = nn.Sequential(*layers)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         self.loss_fn = nn.MSELoss()
+        self.scheduler = None
         self.reset_results()
     
     def forward(self, x):
@@ -70,6 +71,7 @@ class FNN(nn.Module):
                 results[key] = dt.descale(results[key])
         return results
     
+    report_interval = 10
     def perform_training(self,epochs=100, train_size=800, sequence_len=5,batch_size=32, shuffle=True):
         """_summary_
 
@@ -100,6 +102,10 @@ class FNN(nn.Module):
                 self.optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = self.loss_fn(outputs, targets.unsqueeze(1))
+                
+                if self.scheduler:
+                    self.scheduler.step(loss)
+                
                 loss.backward()
                 self.optimizer.step()
                 train_loss += loss.item()
@@ -125,8 +131,13 @@ class FNN(nn.Module):
                 save_path = 'fnn_best_model.pt'
                 torch.save(self.state_dict(), save_path)
             
-            if self.report and epoch % 10 == 0:
-                print(f'Epoch {epoch}: Training Loss = {train_loss:.6f}, Test Loss = {test_loss:.6f}')
+            current_lr = self.optimizer.param_groups[0]['lr']
+            if current_lr < 1e-6:  # Stop if learning rate becomes too small
+                print(f"Learning rate {current_lr:.6f} too small - stopping training")
+                break
+            
+            if self.report and epoch % self.report_interval == 0:
+                print(f'Epoch {epoch}: Training Loss = {train_loss:.6f}, Test Loss = {test_loss:.6f}, Learning Rate = {current_lr:.6f}')
                 
         #load the best model
         self.load_state_dict(torch.load('fnn_best_model.pt'))

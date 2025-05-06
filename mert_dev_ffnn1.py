@@ -5,17 +5,18 @@ import matplotlib.pyplot as plt
 from mert_fnn import FNN
 import torch.nn as nn
 
-window_size = 16
-batch_size = 32
+window_size = 7
+batch_size = 16
 epochs = 100
 hidden_layers = 4
 hidden_size = 64
 shuffle = True
     
 model = FNN(input_size=window_size, hidden_size=hidden_size, hidden_layers=hidden_layers)
-model.optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-#scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
+model.optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+#model.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(model.optimizer, mode='min', factor=0.1, patience=80)
 model.loss_fn = nn.MSELoss()
+model.report_interval = epochs // 10
 print(model)
 
 model.perform_training(epochs=epochs, sequence_len=window_size,batch_size=batch_size, shuffle=shuffle)

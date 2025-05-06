@@ -48,14 +48,14 @@ def to_sequences(dataset:np.array, seq_size=1):
         
     return np.array(x),np.array(y)
 
-seq_size = 5 # Number of time steps to look back 
+seq_size = 16 # Number of time steps to look back 
 #Larger sequences (look further back) may improve forecasting.
 trainX, trainY = to_sequences(train, seq_size)
 testX, testY = to_sequences(test, seq_size)
 
 model = Sequential()
 model.add(Dense(64, input_dim=seq_size, activation='relu')) 
-#model.add(Dense(32, activation='relu'))
+model.add(Dense(32, activation='relu'))
 model.add(Dense(1))
 model.compile(loss='mean_squared_error', optimizer='adam', metrics = ['acc'])
 #print(model.summary()) 
