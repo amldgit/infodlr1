@@ -429,7 +429,7 @@ def experiment_model_architectures(series, hidden_layers_list, layer_sizes_list,
                 # Build the neural network model with custom architecture
                 model = fn.build_ffnn_model(
                     input_dim=lag_order, 
-                    num_layers=n_layers,
+                    num_hidden_layers=n_layers,
                     initial_size=layer_size,
                     drop_out=dropout
                 )
@@ -515,7 +515,7 @@ dropout = 0.2
 # and the best architecture is 2 hidden layers with 128 and 64. We built the best model based on our analysis and
 # perform the training and evaluation.
 
-best_model = fn.build_ffnn_model(input_dim=lag_order, num_layers=num_layers, initial_size=layer_size,drop_out=dropout)
+best_model = fn.build_ffnn_model(input_dim=lag_order, num_hidden_layers=num_layers, initial_size=layer_size,drop_out=dropout)
 # Train the model and get the training history
 results = fn.train_cv(model=best_model, full_dataset=df, lag_order=lag_order)
 history = results["history"]

@@ -11,7 +11,7 @@ from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 
-def build_ffnn_model(input_dim, num_layers=3, initial_size=128, drop_out=0.2):
+def build_ffnn_model(input_dim, num_hidden_layers=2, initial_size=128, drop_out=0.2):
     layers = []
     # First layer
     layers.append(Dense(initial_size, activation='relu', input_dim=input_dim))
@@ -20,9 +20,10 @@ def build_ffnn_model(input_dim, num_layers=3, initial_size=128, drop_out=0.2):
     
     # Hidden layers
     current_size = initial_size
-    for _ in range(num_layers - 2):  # -2 because we already have first and will add output
-        current_size = current_size // 2
+    for _ in range(num_hidden_layers):        
+        #current_size = current_size
         layers.append(Dense(current_size, activation='relu'))
+        current_size = current_size // 2
         if drop_out > 0:
             layers.append(Dropout(drop_out))
     
@@ -44,6 +45,7 @@ def create_dataset(data, lag):
         y.append(data[i, 0])
     return np.array(X), np.array(y)
 
+batch_size = 16
 #scaled_data = None
 def train_full(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:    
     #global scaled_data
@@ -51,10 +53,7 @@ def train_full(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dic
     model.scaled_data = data
     
     # Scale the data and split to sequences, each sequence is lag_order long.
-    X, y = create_dataset(data, lag_order)
-    train_size = int(len(X) * 1.0)
-    X_train, X_val = X[:train_size], X[train_size:]
-    y_train, y_val = y[:train_size], y[train_size:]
+    X, y = create_dataset(data, lag_order)   
 
     early_stopping = EarlyStopping(
     monitor='val_loss',
@@ -62,11 +61,11 @@ def train_full(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dic
     restore_best_weights=True)
     
     execution_history = model.fit(
-    X_train, y_train,
+    X, y,
     #validation_data=(X_val, y_val),
     epochs=epochs,
-    batch_size=32,
-    callbacks=[early_stopping],
+    batch_size=batch_size,
+    #callbacks=[early_stopping],
     verbose=0)
     
     results = {"history": execution_history}
@@ -91,8 +90,7 @@ def train_cv(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_e
     model.scaled_data = data
     
     # Scale the data and split to sequences, each sequence is lag_order long.
-    X, y = create_dataset(data, lag_order)        
-    
+    X, y = create_dataset(data, lag_order)    
     tscv = TimeSeriesSplit(n_splits=5)
 
     cnt = 0
@@ -106,28 +104,31 @@ def train_cv(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_e
         cnt += 1
         print(f"/nFold {cnt}:")
         
-        X_train, X_val = X[train_index], X[test_index]    
-        y_train, y_val = y[train_index], y[test_index]
+        X_train, X_test = X[train_index], X[test_index]    
+        y_train, y_test = y[train_index], y[test_index]
         
         if enable_early_stopping:
             early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)        
-            execution_history = model.fit(X_train, y_train,validation_data=(X_val, y_val),epochs=epochs,batch_size=32,callbacks=[early_stopping], verbose=0)
+            execution_history = model.fit(X_train, y_train,validation_data=(X_test, y_test),epochs=epochs,batch_size=batch_size,callbacks=[early_stopping], verbose=0)
         else:  
-            execution_history = model.fit(X_train, y_train,validation_data=(X_val, y_val),epochs=epochs,batch_size=32, verbose=0)
+            execution_history = model.fit(X_train, y_train,validation_data=(X_test, y_test),epochs=epochs,batch_size=batch_size, verbose=0)
         
-        #results = {"history": execution_history}
         train_loss = np.array(execution_history.history['loss'])
-        training_losses.append(train_loss)
-        validation_losses.append(np.array(execution_history.history['val_loss']))        
+        train_loss_descaled = scaler.inverse_transform(train_loss.reshape(-1, 1)).flatten()
+        training_losses.append(train_loss_descaled)
+        
+        val_loss = np.array(execution_history.history['val_loss'])
+        val_loss_descaled = scaler.inverse_transform(val_loss.reshape(-1, 1)).flatten()
+        validation_losses.append(val_loss_descaled) 
+        
         #Perform predictions
-        y_pred_scaled = model.predict(X_val)
+        y_pred_scaled = model.predict(X_test)
         
         # Descale predictions and actual values as instructed.
-        y_pred_descaled = scaler.inverse_transform(y_pred_scaled).flatten()
-        #results["predictions"] = y_pred_descaled
+        y_pred_descaled = scaler.inverse_transform(y_pred_scaled).flatten()        
         predictions.append(y_pred_descaled)
         
-        y_val_descaled = scaler.inverse_transform(y_val.reshape(-1, 1)).flatten()
+        y_val_descaled = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
         #results["actual"] = y_val_descaled
         actuals.append(y_val_descaled)
         
@@ -161,7 +162,6 @@ def train_cv(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_e
     history = {"loss":avg_loss_train , "val_loss": avg_loss_validation}
     results = {"history":history, "predictions": avg_predictions, "actual": avg_actuals, "mse": avg_mse}
     return results
-    
     
 def generate_future_predictions(model, lag_order, n_steps)-> np.ndarray:
     """Predicts next n_steps data points using the trained model. 
