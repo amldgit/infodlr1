@@ -76,7 +76,7 @@ model = fn.build_ffnn_model(input_dim=lag_order, num_hidden_layers=num_layers, i
 model.summary()
 
 # Train the model and get the training history
-results = fn.train_full(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs)
+results = fn.train(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs)
 history = results["history"]
 
 # Descale the predictions to get actual values

@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 import pandas as pd
 import scipy
 import numpy as np
@@ -30,7 +32,7 @@ def build_ffnn_model(input_dim, num_hidden_layers=2, initial_size=128, drop_out=
     layers.append(Dense(1))  # Output layer for regression
     
     model = Sequential(layers)
-    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
+    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')    
     return model
 
 # Scale the data
@@ -45,41 +47,62 @@ def create_dataset(data, lag):
     return np.array(X), np.array(y)
 
 batch_size = 16
+verbose = 0
 #scaled_data = None
-def train_full(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:    
+def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:    
     #global scaled_data
     data = scaler.fit_transform(full_dataset.values)
     model.scaled_data = data
     
     # Scale the data and split to sequences, each sequence is lag_order long.
-    X, y = create_dataset(data, lag_order)   
+    X, y = create_dataset(data, lag_order)
+    train_size = int(len(X) * 0.8)
+    X_train, X_val = X[:train_size], X[train_size:]
+    y_train, y_val = y[:train_size], y[train_size:]
 
+    # First run with early stopping to find the best epoch.
     early_stopping = EarlyStopping(
     monitor='val_loss',
     patience=20,
     restore_best_weights=True)
     
     execution_history = model.fit(
-    X, y,
-    #validation_data=(X_val, y_val),
+    X_train, y_train,
+    validation_data=(X_val, y_val),
     epochs=epochs,
     batch_size=batch_size,
-    #callbacks=[early_stopping],
-    verbose=0)
+    callbacks=[early_stopping],
+    verbose=verbose)
     
+    # save the results.
     results = {"history": execution_history}
-    # #Perform predictions
-    # y_pred_scaled = model.predict(X_val)
+    #Perform predictions
+    y_pred_scaled = model.predict(X_val)
     
-    # # Descale predictions and actual values as instructed.
-    # y_pred_descaled = scaler.inverse_transform(y_pred_scaled).flatten()
-    # results["predictions"] = y_pred_descaled
+    # Descale predictions and actual values as instructed.
+    y_pred_descaled = scaler.inverse_transform(y_pred_scaled).flatten()
+    results["predictions"] = y_pred_descaled
     
-    # y_val_descaled = scaler.inverse_transform(y_val.reshape(-1, 1)).flatten()
-    # results["actual"] = y_val_descaled
+    y_val_descaled = scaler.inverse_transform(y_val.reshape(-1, 1)).flatten()
+    results["actual"] = y_val_descaled
     
-    # mse = mean_squared_error(y_val_descaled, y_pred_descaled)
-    # results["mse"] = mse
+    mse = mean_squared_error(y_val_descaled, y_pred_descaled)
+    results["mse"] = mse    
+    
+    # Get the best epoch and add one to it, we have more data.
+    #NOTE: This is not the best way to do this, but it works for now and it is not same as the epoch where the 
+    #CV model starts to overfit. CV model starts to overfit around 15/20 epochs, but this one needs more, because
+    #we train it on different data. In CV model we use TimeSeriesSplit, so we have different behavior.
+    best_epoch = np.argmin(execution_history.history['val_loss']) + 1
+    print(f"Best epoch (+1): {best_epoch}")
+    execution_history = model.fit(
+    X_train, y_train,
+    validation_data=(X_val, y_val),
+    epochs=best_epoch,
+    batch_size=batch_size,
+    #callbacks=[early_stopping],
+    verbose=verbose)
+    
     return results
 
 #scaled_data = None
@@ -101,16 +124,16 @@ def train_cv(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_e
     
     for train_index, test_index in tscv.split(X):
         cnt += 1
-        print(f"/nFold {cnt}:")
+        #print(f"/nFold {cnt}:")
         
         X_train, X_test = X[train_index], X[test_index]    
         y_train, y_test = y[train_index], y[test_index]
         
         if enable_early_stopping:
             early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)        
-            execution_history = model.fit(X_train, y_train,validation_data=(X_test, y_test),epochs=epochs,batch_size=batch_size,callbacks=[early_stopping], verbose=0)
+            execution_history = model.fit(X_train, y_train,validation_data=(X_test, y_test),epochs=epochs,batch_size=batch_size,callbacks=[early_stopping], verbose=verbose)
         else:  
-            execution_history = model.fit(X_train, y_train,validation_data=(X_test, y_test),epochs=epochs,batch_size=batch_size, verbose=0)
+            execution_history = model.fit(X_train, y_train,validation_data=(X_test, y_test),epochs=epochs,batch_size=batch_size, verbose=verbose)
         
         train_loss = np.array(execution_history.history['loss'])
         train_loss_descaled = scaler.inverse_transform(train_loss.reshape(-1, 1)).flatten()
@@ -134,11 +157,11 @@ def train_cv(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_e
         mse = mean_squared_error(y_val_descaled, y_pred_descaled)
         #results["mse"] = mse
         losses.append(mse)
-        print (f"Fold {cnt} - MSE: {mse}")
+        #print (f"Fold {cnt} - MSE: {mse}")
         
     # Calculate average MSE across all folds
     avg_mse = np.mean(losses)
-    print(f"Average MSE across all folds: {avg_mse}")
+    #print(f"Average MSE across all folds: {avg_mse}")
     # Calculate average loss across all folds
     # Calculate average loss across all folds
     
