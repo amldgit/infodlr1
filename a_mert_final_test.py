@@ -3,16 +3,8 @@ import warnings
 warnings.filterwarnings("ignore")
 import pandas as pd
 import scipy
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.optimizers import Adam
-import mert_ffnn_keras as fn
+import a_mert_ffnn_keras_cv as fn
 
 # Load the .mat file as data frame
 __mat_data__ = scipy.io.loadmat('Xtrain.mat')
@@ -25,20 +17,24 @@ df = pd.DataFrame(__mat_data__['Xtrain'])
 
 # Set the lag order - number of previous time steps to use as features
 lag_order = 7
+num_layers = 2 # Number of hidden layers
+initial_size = 128 # Initial size of the first hidden layer
+drop_out = 0.2 # Dropout rate for regularization
 pred_horizon = 200  # Number of time steps to predict
+epochs = 200 # Number of epochs for training
 
 # Build the model
-model = fn.build_ffnn_model(input_dim=lag_order)
+model = fn.build_ffnn_model(input_dim=lag_order, num_layers=num_layers, initial_size=initial_size, drop_out=drop_out)
 #model.summary()
 
 # Train the model and get the training history
-results = fn.train(model=model, full_dataset=df, lag_order=lag_order)
+results = fn.train(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs)
 history = results["history"]
 
 # %% Plot training history
 plt.figure(figsize=(12, 6))
-plt.plot(history.history['loss'], label='Training Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.plot(history['loss'], label='Training Loss')
+plt.plot(history['val_loss'], label='Validation Loss')
 plt.title('Model Loss')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')

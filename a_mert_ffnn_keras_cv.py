@@ -2,6 +2,7 @@ import pandas as pd
 import scipy
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 import tensorflow as tf
@@ -44,44 +45,83 @@ def create_dataset(data, lag):
     return np.array(X), np.array(y)
 
 #scaled_data = None
-def train(model, full_dataset:pd.DataFrame, lag_order) -> dict:    
+def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:    
     #global scaled_data
     data = scaler.fit_transform(full_dataset.values)
     model.scaled_data = data
     
     # Scale the data and split to sequences, each sequence is lag_order long.
-    X, y = create_dataset(data, lag_order)
-    train_size = int(len(X) * 0.8)
-    X_train, X_val = X[:train_size], X[train_size:]
-    y_train, y_val = y[:train_size], y[train_size:]
+    X, y = create_dataset(data, lag_order)        
+    
+    tscv = TimeSeriesSplit(n_splits=5)
 
-    early_stopping = EarlyStopping(
-    monitor='val_loss',
-    patience=20,
-    restore_best_weights=True)
+    cnt = 0
+    losses = []
+    predictions = []
+    actuals = []
+    training_losses = []
+    validation_losses = []
     
-    execution_history = model.fit(
-    X_train, y_train,
-    validation_data=(X_val, y_val),
-    epochs=200,
-    batch_size=32,
-    callbacks=[early_stopping],
-    verbose=0)
+    for train_index, test_index in tscv.split(X):
+        cnt += 1
+        print(f"/nFold {cnt}:")
+        
+        X_train, X_val = X[train_index], X[test_index]    
+        y_train, y_val = y[train_index], y[test_index]
+        
+        early_stopping = EarlyStopping(
+        monitor='val_loss',
+        patience=20,
+        restore_best_weights=True)
+        
+        execution_history = model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        epochs=epochs,
+        batch_size=32,
+        callbacks=[early_stopping],
+        verbose=0)
+        
+        #results = {"history": execution_history}
+        train_loss = execution_history.history['loss']
+        training_losses.append(train_loss)
+        validation_losses.append(execution_history.history['val_loss'])
+        #Perform predictions
+        y_pred_scaled = model.predict(X_val)
+        
+        # Descale predictions and actual values as instructed.
+        y_pred_descaled = scaler.inverse_transform(y_pred_scaled).flatten()
+        #results["predictions"] = y_pred_descaled
+        predictions.append(y_pred_descaled)
+        
+        y_val_descaled = scaler.inverse_transform(y_val.reshape(-1, 1)).flatten()
+        #results["actual"] = y_val_descaled
+        actuals.append(y_val_descaled)
+        
+        mse = mean_squared_error(y_val_descaled, y_pred_descaled)
+        #results["mse"] = mse
+        losses.append(mse)
+        print (f"Fold {cnt} - MSE: {mse}")
+        
+    # Calculate average MSE across all folds
+    avg_mse = np.mean(losses)
+    print(f"Average MSE across all folds: {avg_mse}")
+    # Calculate average loss across all folds
+    # Calculate average loss across all folds
+    #avg_loss_train = np.mean(training_losses, axis=0)
+    #avg_loss_validation = np.mean(validation_losses, axis=0)
+    #print(f"Average loss across all folds: {avg_loss_validation}")
+    # Calculate average predictions across all folds
+    avg_predictions = np.mean(predictions, axis=0)
+    # Calculate average actuals across all folds
+    avg_actuals = np.mean(actuals, axis=0)
+    # Calculate average history across all folds
+    #avg_loss_train = np.mean(training_losses, axis=0)
     
-    results = {"history": execution_history}
-    #Perform predictions
-    y_pred_scaled = model.predict(X_val)
-    
-    # Descale predictions and actual values as instructed.
-    y_pred_descaled = scaler.inverse_transform(y_pred_scaled).flatten()
-    results["predictions"] = y_pred_descaled
-    
-    y_val_descaled = scaler.inverse_transform(y_val.reshape(-1, 1)).flatten()
-    results["actual"] = y_val_descaled
-    
-    mse = mean_squared_error(y_val_descaled, y_pred_descaled)
-    results["mse"] = mse
+    history = {"loss":training_losses[0] , "val_loss": validation_losses[0]}
+    results = {"history":history, "predictions": avg_predictions, "actual": avg_actuals, "mse": avg_mse}
     return results
+    
     
 def generate_future_predictions(model, lag_order, n_steps)-> np.ndarray:
     """Predicts next n_steps data points using the trained model. 
