@@ -45,7 +45,47 @@ def create_dataset(data, lag):
     return np.array(X), np.array(y)
 
 #scaled_data = None
-def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_early_stopping = False) -> dict:    
+def train_full(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:    
+    #global scaled_data
+    data = scaler.fit_transform(full_dataset.values)
+    model.scaled_data = data
+    
+    # Scale the data and split to sequences, each sequence is lag_order long.
+    X, y = create_dataset(data, lag_order)
+    train_size = int(len(X) * 1.0)
+    X_train, X_val = X[:train_size], X[train_size:]
+    y_train, y_val = y[:train_size], y[train_size:]
+
+    early_stopping = EarlyStopping(
+    monitor='val_loss',
+    patience=20,
+    restore_best_weights=True)
+    
+    execution_history = model.fit(
+    X_train, y_train,
+    #validation_data=(X_val, y_val),
+    epochs=epochs,
+    batch_size=32,
+    callbacks=[early_stopping],
+    verbose=0)
+    
+    results = {"history": execution_history}
+    # #Perform predictions
+    # y_pred_scaled = model.predict(X_val)
+    
+    # # Descale predictions and actual values as instructed.
+    # y_pred_descaled = scaler.inverse_transform(y_pred_scaled).flatten()
+    # results["predictions"] = y_pred_descaled
+    
+    # y_val_descaled = scaler.inverse_transform(y_val.reshape(-1, 1)).flatten()
+    # results["actual"] = y_val_descaled
+    
+    # mse = mean_squared_error(y_val_descaled, y_pred_descaled)
+    # results["mse"] = mse
+    return results
+
+#scaled_data = None
+def train_cv(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_early_stopping = False) -> dict:    
     #global scaled_data
     data = scaler.fit_transform(full_dataset.values)
     model.scaled_data = data

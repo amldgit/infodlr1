@@ -16,9 +16,9 @@ df = pd.DataFrame(__mat_data__['Xtrain'])
 # From the previous analysis, we saw lag 16 was a good choice
 
 # Set the lag order - number of previous time steps to use as features
-lag_order = 7
+lag_order = 50
 num_layers = 2 # Number of hidden layers
-initial_size = 128 # Initial size of the first hidden layer
+initial_size = 64 # Initial size of the first hidden layer
 drop_out = 0.2 # Dropout rate for regularization
 pred_horizon = 200  # Number of time steps to predict
 epochs = 100 # Number of epochs for training
@@ -28,7 +28,7 @@ model = fn.build_ffnn_model(input_dim=lag_order, num_layers=num_layers, initial_
 #model.summary()
 
 # Train the model and get the training history
-results = fn.train(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs, enable_early_stopping=False)
+results = fn.train_cv(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs, enable_early_stopping=False)
 history = results["history"]
 
 # %% Plot training history
@@ -60,6 +60,15 @@ plt.ylabel('Value')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+#retrain with full data and predict
+# Build the model
+model = fn.build_ffnn_model(input_dim=lag_order, num_layers=num_layers, initial_size=initial_size, drop_out=drop_out)
+#model.summary()
+
+# Train the model and get the training history
+results = fn.train_full(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs)
+history = results["history"]
 
 # Descale the predictions to get actual values
 future_predictions_descaled = fn.generate_future_predictions(model, lag_order, pred_horizon)

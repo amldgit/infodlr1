@@ -264,7 +264,7 @@ def evaluate_nn_lag_orders(series, max_lag=30):
         model = fn.build_ffnn_model(input_dim=lag, drop_out=dropout)
         
         # Train the model and get results
-        results = fn.train(model=model, full_dataset=data_df, lag_order=lag,enable_early_stopping=enable_early_stopping)
+        results = fn.train_cv(model=model, full_dataset=data_df, lag_order=lag,enable_early_stopping=enable_early_stopping)
         
         # Record the validation MSE
         val_mse = results["mse"]
@@ -343,7 +343,7 @@ def run_multiple_nn_trials(series, selected_lags, num_trials=10):
             model = fn.build_ffnn_model(input_dim=lag, drop_out=dropout)
             
             # Train the model and get results
-            trial_results = fn.train(model=model, full_dataset=data_df, lag_order=lag)
+            trial_results = fn.train_cv(model=model, full_dataset=data_df, lag_order=lag)
             
             # Record the validation MSE
             val_mse = trial_results["mse"]
@@ -435,7 +435,7 @@ def experiment_model_architectures(series, hidden_layers_list, layer_sizes_list,
                 )
                 
                 # Train the model and get results
-                trial_results = fn.train(model=model, full_dataset=data_df, lag_order=lag_order)
+                trial_results = fn.train_cv(model=model, full_dataset=data_df, lag_order=lag_order)
                 
                 # Record the validation MSE
                 pred_mse = trial_results["mse"]
@@ -517,7 +517,7 @@ dropout = 0.2
 
 best_model = fn.build_ffnn_model(input_dim=lag_order, num_layers=num_layers, initial_size=layer_size,drop_out=dropout)
 # Train the model and get the training history
-results = fn.train(model=best_model, full_dataset=df, lag_order=lag_order)
+results = fn.train_cv(model=best_model, full_dataset=df, lag_order=lag_order)
 history = results["history"]
 # Plot training history
 plt.figure(figsize=(12, 6))
