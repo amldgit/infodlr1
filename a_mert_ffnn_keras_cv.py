@@ -45,7 +45,7 @@ def create_dataset(data, lag):
     return np.array(X), np.array(y)
 
 #scaled_data = None
-def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:    
+def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_early_stopping = False) -> dict:    
     #global scaled_data
     data = scaler.fit_transform(full_dataset.values)
     model.scaled_data = data
@@ -69,23 +69,16 @@ def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:
         X_train, X_val = X[train_index], X[test_index]    
         y_train, y_val = y[train_index], y[test_index]
         
-        early_stopping = EarlyStopping(
-        monitor='val_loss',
-        patience=20,
-        restore_best_weights=True)
-        
-        execution_history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=epochs,
-        batch_size=32,
-        callbacks=[early_stopping],
-        verbose=0)
+        if enable_early_stopping:
+            early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)        
+            execution_history = model.fit(X_train, y_train,validation_data=(X_val, y_val),epochs=epochs,batch_size=32,callbacks=[early_stopping], verbose=0)
+        else:  
+            execution_history = model.fit(X_train, y_train,validation_data=(X_val, y_val),epochs=epochs,batch_size=32, verbose=0)
         
         #results = {"history": execution_history}
-        train_loss = execution_history.history['loss']
+        train_loss = np.array(execution_history.history['loss'])
         training_losses.append(train_loss)
-        validation_losses.append(execution_history.history['val_loss'])
+        validation_losses.append(np.array(execution_history.history['val_loss']))        
         #Perform predictions
         y_pred_scaled = model.predict(X_val)
         
@@ -108,8 +101,10 @@ def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:
     print(f"Average MSE across all folds: {avg_mse}")
     # Calculate average loss across all folds
     # Calculate average loss across all folds
-    #avg_loss_train = np.mean(training_losses, axis=0)
-    #avg_loss_validation = np.mean(validation_losses, axis=0)
+    
+    # Stack the arrays and compute mean along axis 0 (across folds)    
+    avg_loss_train = np.mean(training_losses, axis=0)
+    avg_loss_validation = np.mean(validation_losses, axis=0)
     #print(f"Average loss across all folds: {avg_loss_validation}")
     # Calculate average predictions across all folds
     avg_predictions = np.mean(predictions, axis=0)
@@ -118,7 +113,7 @@ def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200) -> dict:
     # Calculate average history across all folds
     #avg_loss_train = np.mean(training_losses, axis=0)
     
-    history = {"loss":training_losses[0] , "val_loss": validation_losses[0]}
+    history = {"loss":avg_loss_train , "val_loss": avg_loss_validation}
     results = {"history":history, "predictions": avg_predictions, "actual": avg_actuals, "mse": avg_mse}
     return results
     
