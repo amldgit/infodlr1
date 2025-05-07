@@ -103,8 +103,13 @@ def train(model, full_dataset:pd.DataFrame, lag_order=7, epochs=200, enable_earl
     # Calculate average loss across all folds
     
     # Stack the arrays and compute mean along axis 0 (across folds)    
-    avg_loss_train = np.mean(training_losses, axis=0)
-    avg_loss_validation = np.mean(validation_losses, axis=0)
+    if enable_early_stopping:
+        avg_loss_train = None
+        avg_loss_validation = None
+    else:        
+        avg_loss_train = np.mean(np.array(training_losses), axis=0)
+        avg_loss_validation = np.mean(np.array(validation_losses), axis=0)
+        
     #print(f"Average loss across all folds: {avg_loss_validation}")
     # Calculate average predictions across all folds
     avg_predictions = np.mean(predictions, axis=0)

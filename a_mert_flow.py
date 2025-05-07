@@ -11,7 +11,7 @@ import statsmodels.api as sm
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
 import numpy as np
-import a_mert_ffnn_keras as fn
+import a_mert_ffnn_keras_cv as fn
 
 #This is the .mat file as data frame.
 __mat_data__ = scipy.io.loadmat('Xtrain.mat')
@@ -252,6 +252,7 @@ def evaluate_nn_lag_orders(series, max_lag=30):
     best_lag = None
     best_mse = float('inf')
     dropout = 0.0  # Disable dropout for this test
+    enable_early_stopping = True
     
     # Convert series to DataFrame as required by the train function
     data_df = series.to_frame()
@@ -263,7 +264,7 @@ def evaluate_nn_lag_orders(series, max_lag=30):
         model = fn.build_ffnn_model(input_dim=lag, drop_out=dropout)
         
         # Train the model and get results
-        results = fn.train(model=model, full_dataset=data_df, lag_order=lag)
+        results = fn.train(model=model, full_dataset=data_df, lag_order=lag,enable_early_stopping=enable_early_stopping)
         
         # Record the validation MSE
         val_mse = results["mse"]
@@ -279,7 +280,7 @@ def evaluate_nn_lag_orders(series, max_lag=30):
     return val_mse_scores, best_model, best_lag, best_mse
 
 # Evaluate different lag orders with neural network
-max_lag_nn = 16  # Adjust based on available computation time
+max_lag_nn = 50  # Adjust based on available computation time
 nn_val_mse_scores, best_nn_model, best_nn_lag, best_nn_mse = evaluate_nn_lag_orders(
     df[0], max_lag=max_lag_nn)
 
