@@ -21,9 +21,8 @@ def build_ffnn_model(input_dim, num_hidden_layers=2, initial_size=128, drop_out=
     # Hidden layers
     current_size = initial_size
     for _ in range(num_hidden_layers):        
-        #current_size = current_size
-        layers.append(Dense(current_size, activation='relu'))
         current_size = current_size // 2
+        layers.append(Dense(current_size, activation='relu'))        
         if drop_out > 0:
             layers.append(Dropout(drop_out))
     
