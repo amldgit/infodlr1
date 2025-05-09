@@ -11,7 +11,7 @@ import statsmodels.api as sm
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
 import numpy as np
-import a_mert_ffnn_keras_cv as fn
+import ffnn_keras_cv as fn
 
 #This is the .mat file as data frame.
 __mat_data__ = scipy.io.loadmat('Xtrain.mat')

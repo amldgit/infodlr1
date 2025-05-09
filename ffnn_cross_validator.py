@@ -4,7 +4,7 @@ warnings.filterwarnings("ignore")
 import pandas as pd
 import scipy
 import matplotlib.pyplot as plt
-import a_mert_ffnn_keras_cv as fn
+import ffnn_keras_cv as fn
 
 # Load the .mat file as data frame
 __mat_data__ = scipy.io.loadmat('Xtrain.mat')
@@ -190,3 +190,4 @@ plt.ylabel('Value (Original Scale)')
 plt.legend()
 plt.grid(True)
 plt.show()
+# %%
