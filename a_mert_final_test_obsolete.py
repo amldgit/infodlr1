@@ -66,38 +66,65 @@ epochs = 30 # Number of epochs for training
 # plt.show()
 
 # %%
+best_mse = float('inf')
+
 for i in range(tests):
     # Build the model
-    drop_out = 0.0 # disable dropout for prediction, we go full with all neurons activated.
+    drop_out = 0.1 # disable dropout for prediction, we go full with all neurons activated.
     model = fn.build_ffnn_model(input_dim=lag_order, num_hidden_layers=num_layers, initial_size=initial_size, drop_out=drop_out)
-    #load the best model from file
-    model.load_weights("final_model_625-best-40x1x256.h5")
-    #model.load_weights("final_model.h5")
-    #model.summary()
-    data = fn.scaler.fit_transform(df.values)
-    model.scaled_data = data
+    results = fn.train_cv(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs, enable_early_stopping=False)
+    history = results["history"]   
 
-    # Train the model and get the training history
-    #results = fn.train(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs)
-    #history = results["history"]
-    #save the model
-    #model.save("final_model.h5")
+    ## %% Plot training history
+    plt.figure(figsize=(12, 6))
+    plt.plot(history['loss'], label='Training Loss')
+    plt.plot(history['val_loss'], label='Validation Loss')
+    plt.title('Model Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
-    # Descale the predictions to get actual values
-    predictions = fn.generate_future_predictions(model, lag_order, pred_horizon)
+    # Get the descaled actual and predicted values
+    y_val_descaled =  results["actual"]
+    y_pred_descaled = results["predictions"]
 
-    # Get the last portion of historical data for plotting context (descaled)
-    #historical_data = df.iloc[-100:, 0].values
-    historical_data = df.values
+    # Calculate MSE on descaled values
+    val_mse = results["mse"]
+    print(f"Validation MSE (on original scale): {val_mse:.4f}")
 
+    # Plot actual vs predicted for validation set (descaled)
+    plt.figure(figsize=(14, 7))
+    plt.plot(y_val_descaled, label='Actual')
+    plt.plot(y_pred_descaled, label='Predicted')
+    plt.title('Actual vs Predicted Values - Validation Set (Original Scale)')
+    plt.xlabel('Time Steps')
+    plt.ylabel('Value')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # predictions
+    scaled_data = model.scaled_data
+    model = fn.build_ffnn_model(input_dim=lag_order, num_hidden_layers=num_layers, initial_size=initial_size, drop_out=0.0)
+    model.scaled_data = scaled_data
+    results = fn.train(model=model, full_dataset=df, lag_order=lag_order, epochs=epochs)
     #load the test data
     __mat_data__ = scipy.io.loadmat('Xtest.mat')
     # Convert to DataFrame, there is only one variable in the .mat file
     df_test = pd.DataFrame(__mat_data__['Xtest']).values
     # convert future preductions to integer
+    predictions = fn.generate_future_predictions(model, lag_order, pred_horizon)
     predictions = predictions.astype(int).T
     mse = mean_squared_error(df_test, predictions)
     print(f"Test MSE (on original scale): {mse:.4f}")
+    
+    if mse < best_mse:
+        best_mse = mse
+        # Save the model
+        model.save("final_model.h5")
+        print(f"Model saved with MSE: {best_mse:.4f}")
 
     # Plot actual vs predicted for validation set (descaled)
     plt.figure(figsize=(14, 7))
