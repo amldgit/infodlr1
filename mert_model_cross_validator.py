@@ -14,7 +14,7 @@ df = pd.DataFrame(__mat_data__['Xtrain'])
 ## %% Data preparation
 # Based on the previous analysis, we know the data is stationary and we can use lag features
 # From the previous analysis, we saw lag 16 was a good choice
-test_set_lags = [8, 16, 32, 40, 50]
+test_set_lags = [8, 10 , 20, 30, 40, 50, 100]
 hidden_layers = [1, 2, 3, 4]
 initial_sizes = [16, 32, 64, 128, 256]
 # We will now test the parameter combinations above with cross-validation and select the best one.
