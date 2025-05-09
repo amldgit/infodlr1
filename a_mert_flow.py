@@ -220,6 +220,19 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
+#After test data is publised. We added this code to comparison.
+__mat_data__ = scipy.io.loadmat('Xtest.mat')
+# Convert to DataFrame, there is only one variable in the .mat file
+df_test = pd.DataFrame(__mat_data__['Xtest']).values.flatten()
+train = fn.scaler.fit_transform(df.values)
+
+X_train,y_train = fn.create_dataset(train, best_lag_ols)
+model = sm.OLS(y_train, X_train).fit()
+model.scaled_data = train
+predictions = fn.generate_predictions_lin(model, best_lag_ols, len(df_test))
+mse_pred = mean_squared_error(df_test, predictions)
+print(f"Test MSE (on original scale): {mse_pred:.4f}")
+
 # %% [markdown]
 # ### 3. Neural Network Model Selection and Initial Setup
 # The best practice is to use recurrent neural networks (RNN) for sequential data,
@@ -227,327 +240,18 @@ plt.show()
 # we argue that a FFNN is sufficient for this task and will be easier to implement.
 # We chose the Keras library to implement the FFNN model for the same reason, 
 # it encapsulates and simplifies the implementation more than the alternatives such as pytorch.
-# As FFNN architecture we decided to use a pyramidal structure, which is a common practice based on 
-# our research. Initially, the model has 3 hidden layers with 128, 64 and 32 neurons and predicts one single
-# value. This structure ensures that the model learns many features in the first layer and then reduces 
+# As FFNN architecture we decided to use a pyramidal structure, which is a common practice based on our research. 
+# In our implementation the size of the first hidden layer is passed as a parameter and number of hidden layers as well.
+# For each hidden layer we will use 50% of the previous layer size, and the last layer will have 1 neuron.
+# This structure ensures that the model learns many features in the first layer and then reduces 
 # the number of features, eliminating the less important ones. Dropout layers are added between the hidden layers
-# to prevent overfitting. The dropout rate is set to 0.2, which is a common practice. 
-# We decided to use Adam optimizer with fixed learning rate of 0.001, with maximum number of epochs is set to 200.
-# This will ensure that the model has enough time to learn the data, considering that the data is not too large. 
+# to prevent overfitting. The dropout rate is set to 0.1 and number of epochs for cross validation is set to 30, these values are decided based on experimentation. 
+# We decided to use Adam optimizer with fixed learning rate of 0.001. The loss function is set to mean squared error (MSE), which is a common choice for regression problems.
+
+# We implemented a croos-validation function to evaluate the model performance using TimeSeriesSplit from sklearn package. 
+
+# For the generating predictions we will use the last 200 data points to predict the next 200 data points in a recursive manner as instructed in the assignment.
+# These predictions are compared with the actual values from the given test data. We disabled the dropout layers during the prediction phase.
 # Early stopping is used to stop the training if there is no improvement in the validation loss for 20 epochs to avoid overfitting. 
-# The batch size is set to 32, which is a common practice for FFNN models. We think that this is a good starting
-# point for the model, but we will experiment with different hidden layers and sizes later. 
-#
-# ### 4. Neural Network Validation MSE for Different Lag Orders
-# We'll evaluate different lag orders using our neural network model to determine the best lag order.
-# We will use lag orders from 1 to 40, because cross validation with OLS before showed that there is 
-# no improvement after 40. The dropout will be disabled for this test, 
-# because we do not want to introduce randomness in the model. We will deal with overfitting later.
-def evaluate_nn_lag_orders(series, max_lag=30):
-    """
-    Evaluate different lag orders using neural network model and record validation MSE.
-    """
-    val_mse_scores = {}
-    best_model = None
-    best_lag = None
-    best_mse = float('inf')
-    dropout = 0.0  # Disable dropout for this test
-    enable_early_stopping = True
-    
-    # Convert series to DataFrame as required by the train function
-    data_df = series.to_frame()
-    
-    for lag in range(1, max_lag+1):
-        print(f"Testing lag order: {lag}")
-        
-        # Build the neural network model
-        model = fn.build_ffnn_model(input_dim=lag, drop_out=dropout)
-        
-        # Train the model and get results
-        results = fn.train_cv(model=model, full_dataset=data_df, lag_order=lag,enable_early_stopping=enable_early_stopping)
-        
-        # Record the validation MSE
-        val_mse = results["mse"]
-        val_mse_scores[lag] = val_mse
-        print(f"Lag {lag}: Validation MSE = {val_mse:.4f}")
-        
-        # Check if this is the best model so far
-        if val_mse < best_mse:
-            best_mse = val_mse
-            best_lag = lag
-            best_model = model
-    
-    return val_mse_scores, best_model, best_lag, best_mse
+# The batch size is set to 16.
 
-# Evaluate different lag orders with neural network
-max_lag_nn = 50  # Adjust based on available computation time
-nn_val_mse_scores, best_nn_model, best_nn_lag, best_nn_mse = evaluate_nn_lag_orders(
-    df[0], max_lag=max_lag_nn)
-
-# %%
-print(f"Best Neural Network lag order: {best_nn_lag} with Validation MSE: {best_nn_mse:.4f}")
-
-# remove the first lag from the plot. 
-# Because it does not carry any information about past data points and too high. It confuses the plot.
-nn_val_mse_scores.pop(1, None)
-
-# Find the 3 lowest MSE values and their corresponding lags
-sorted_lags = sorted(nn_val_mse_scores.items(), key=lambda x: x[1])
-best_3_lags = [lag for lag, _ in sorted_lags[:3]]
-
-# Plot validation MSE for different lag orders
-plt.figure(figsize=(12, 6))
-plt.plot(list(nn_val_mse_scores.keys()), list(nn_val_mse_scores.values()), marker='o', color='green')
-
-# Add vertical lines for the 3 best lags
-for lag in best_3_lags:
-    plt.axvline(x=lag, color='r', linestyle='--', 
-                label=f'Best Lag {best_3_lags.index(lag)+1}: {lag}')
-
-plt.xlabel('Lag Order')
-plt.ylabel('Validation MSE')
-plt.title('Neural Network Validation MSE for Different Lag Orders')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-# %% [markdown]
-# Depending on our experimentation, the variation for neural network starts around lag order 7 for FFNN, 
-# which can be explained by the overfitting of the model. Please recall that we disabled the dropout to avoid randomness. 
-# But this still gives a good insight about the lag order when considered together with the information criteria 
-# and OLS based analysis earlier. We decided to focus on the lag orders 7, 15, 20 and 28 for the final model, based
-# on our experimentation and the results of the previous analysis.
-# We will enable the dropout again and train the model with these lag orders, 10 times for each lag order and
-# average the results, to pick the best lag order. 
-selected_lags = [7, 15, 20, 28]
-
-def run_multiple_nn_trials(series, selected_lags, num_trials=10):
-    """
-    Run the FFNN model multiple times for each selected lag order and record validation MSEs.
-    """
-    results = {lag: [] for lag in selected_lags}
-    
-    # Convert series to DataFrame as required by the train function
-    data_df = series.to_frame()
-    
-    # Enable dropout for these trials to prevent overfitting
-    dropout = 0.2
-    
-    for lag in selected_lags:
-        print(f"\nEvaluating lag order: {lag} with {num_trials} trials")
-        
-        for trial in range(1, num_trials+1):
-            print(f"  lag: {lag} - trial {trial}/{num_trials}...")
-            
-            # Build the neural network model
-            model = fn.build_ffnn_model(input_dim=lag, drop_out=dropout)
-            
-            # Train the model and get results
-            trial_results = fn.train_cv(model=model, full_dataset=data_df, lag_order=lag)
-            
-            # Record the validation MSE
-            val_mse = trial_results["mse"]
-            results[lag].append(val_mse)
-            print(f"    Validation MSE: {val_mse:.4f}")
-    
-    # Print summary statistics
-    for lag in selected_lags:
-        mean_mse = np.mean(results[lag])
-        std_mse = np.std(results[lag])
-        print(f"\nLag {lag} - Mean MSE: {mean_mse:.4f}, Std Dev: {std_mse:.4f}")
-    
-    return results
-
-val_mse_trials = run_multiple_nn_trials(df[0], selected_lags=selected_lags, num_trials=10)
-
-# %%
-# Convert results to DataFrame
-lag_results_df = pd.DataFrame()
-for lag in selected_lags:
-    lag_results_df[f'Lag {lag}'] = val_mse_trials[lag]
-
-# Add mean row
-lag_results_df.loc['Mean'] = lag_results_df.mean()
-
-# Display table
-print("\nValidation MSE Results:")
-print(lag_results_df.round(4))
-# Find the lag order with the lowest mean MSE
-best_lag = int(lag_results_df.loc['Mean'].idxmin().split()[1])
-
-# Perform pairwise t-tests between all lag orders
-significance_matrix = pd.DataFrame(index=selected_lags, columns=selected_lags)
-
-for lag1 in selected_lags:
-    for lag2 in selected_lags:
-        if lag1 == lag2:
-            significance_matrix.loc[lag1, lag2] = ' '
-        else:
-            t_stat, p_value = scipy.stats.ttest_ind(val_mse_trials[lag1], val_mse_trials[lag2])
-            significance_matrix.loc[lag1, lag2] = 'X' if p_value < 0.05 else '-'
-
-print("\nStatistical Significance Matrix (α=0.05), X = significant:")
-print(significance_matrix)
-
-print(f"\nBest lag order based on mean validation MSE: {best_lag}")
-# %% [markdown]
-# ### 5. Model Structure Experimentation
-# Based on the analysis, we can conclude that the best lag order for this data is 7, but in some experiments
-# we found that the diffierence between 7 and 15 is not statistically significant. 
-# Therefore, we will use 7 as the lag order fixed and investigate different model architectures.
-# We will experiment with different number of hidden layers and layer sizes and run the model 10 times for each configuration.
-
-hidden_layers = [1, 2, 3]
-layer_sizes = [32, 64, 128]
-lag_order = 7
-
-def experiment_model_architectures(series, hidden_layers_list, layer_sizes_list, lag_order, num_trials=10):
-    """
-    Experiment with different neural network architectures by varying the number of 
-    hidden layers and layer sizes.
-    """
-    # Create a dictionary to store results
-    results = {}
-    
-    # Convert series to DataFrame as required by the train function
-    data_df = series.to_frame()
-    
-    # Enable dropout for these trials
-    dropout = 0.2
-    
-    for n_layers in hidden_layers_list:
-        for layer_size in layer_sizes_list:
-            config_name = f"{n_layers} layers, {layer_size} neurons"
-            print(f"\nEvaluating architecture: {config_name} with {num_trials} trials")
-            
-            # Initialize list to store MSE values for this configuration
-            results[config_name] = []
-            
-            for trial in range(1, num_trials+1):
-                print(f"  Architecture: {config_name} - Trial {trial}/{num_trials}...")
-                
-                # Build the neural network model with custom architecture
-                model = fn.build_ffnn_model(
-                    input_dim=lag_order, 
-                    num_hidden_layers=n_layers,
-                    initial_size=layer_size,
-                    drop_out=dropout
-                )
-                
-                # Train the model and get results
-                trial_results = fn.train_cv(model=model, full_dataset=data_df, lag_order=lag_order)
-                
-                # Record the validation MSE
-                pred_mse = trial_results["mse"]
-                results[config_name].append(pred_mse)
-                print(f"    Validation MSE: {pred_mse:.4f}")
-    
-    # Print summary statistics
-    print("\nArchitecture comparison summary:")
-    for config, mse_values in results.items():
-        mean_mse = np.mean(mse_values)
-        std_mse = np.std(mse_values)
-        print(f"{config} - Mean MSE: {mean_mse:.4f}, Std Dev: {std_mse:.4f}")
-    
-    return results
-
-# Run the architecture experiments
-architecture_results = experiment_model_architectures(df[0], hidden_layers, layer_sizes, lag_order, num_trials=10)
-
-# %%
-# Convert results to DataFrame for easier analysis
-arch_results_df = pd.DataFrame()
-for config, mse_values in architecture_results.items():
-    arch_results_df[config] = mse_values
-
-# Add mean row
-arch_results_df.loc['Mean'] = arch_results_df.mean()
-arch_results_df.loc['Std Dev'] = arch_results_df.std()
-
-# Get the means and standard deviations for each architecture
-means = arch_results_df.loc['Mean']
-stdevs = arch_results_df.loc['Std Dev']
-
-# Create a DataFrame with means and standard deviations
-arch_comparison = pd.DataFrame({
-    'Mean MSE': means,
-    'Std Dev': stdevs
-})
-
-# Sort by mean MSE and get top 5
-best_5_architectures = arch_comparison.sort_values('Mean MSE').head(5)
-
-print("\nTop 5 Architectures:")
-print(best_5_architectures.round(4))
-
-# Perform pairwise t-tests between the top 4 architectures
-top_4_names = best_5_architectures.index
-
-# significance_matrix = pd.DataFrame(index=top_4_names, columns=top_4_names)
-
-# for arch1 in top_4_names:
-#     for arch2 in top_4_names:
-#         if arch1 == arch2:
-#             significance_matrix.loc[arch1, arch2] = ' '
-#         else:
-#             t_stat, p_value = scipy.stats.ttest_ind(
-#                 arch_results_df[arch1], 
-#                 arch_results_df[arch2]
-#             )
-#             significance_matrix.loc[arch1, arch2] = 'X' if p_value < 0.05 else '-'
-
-# print("\nStatistical Significance Matrix for Top 4 Architectures (α=0.05), X = significant:")
-# print(significance_matrix)
-
-# Select best architecture based on lowest mean MSE
-best_architecture = best_5_architectures.index[0]
-print(f"\nBest architecture based on mean validation MSE: {best_architecture}")
-# Extract the best model parameters
-# Extract parameters
-lag_order = 7
-num_layers = int(best_architecture.split()[0])
-layer_size = int(best_architecture.split()[2])
-dropout = 0.2
-
-# %% [markdown]
-# ## Final Model
-# Based on the analysis, we can conclude that the best lag order for this data is 7,
-# and the best architecture is 2 hidden layers with 128 and 64. We built the best model based on our analysis and
-# perform the training and evaluation.
-
-best_model = fn.build_ffnn_model(input_dim=lag_order, num_hidden_layers=num_layers, initial_size=layer_size,drop_out=dropout)
-# Train the model and get the training history
-results = fn.train_cv(model=best_model, full_dataset=df, lag_order=lag_order)
-history = results["history"]
-# Plot training history
-plt.figure(figsize=(12, 6))
-plt.plot(history.history['loss'], label='Training Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
-plt.title('Model Loss')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-# Predict the next 200 values
-pred_horizon = 200
-# Generate future predictions
-future_predictions = fn.generate_future_predictions(best_model, lag_order, pred_horizon)
-# Get the existing data for plotting context
-historical_data = df.values
-# Plot the future predictions with historical data
-plt.figure(figsize=(14, 7))
-# Plot some historical data for context
-plt.plot(range(-len(historical_data), 0), historical_data, label='Historical Data')
-# Plot the predictions
-plt.plot(range(0, pred_horizon), future_predictions, label='Future Predictions', color='orange')
-plt.axvline(x=0, color='k', linestyle='--')
-plt.title(f'Prediction of Next {pred_horizon} Time Steps')
-plt.xlabel('Time Steps')
-plt.ylabel('Value')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-# %%

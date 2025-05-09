@@ -16,7 +16,7 @@ from tensorflow.keras.optimizers import Adam
 def build_ffnn_model(input_dim, num_hidden_layers=2, initial_size=128, drop_out=0.2):
     layers = []
     # First layer
-    layers.append(Dense(initial_size, activation='relu', input_dim=input_dim))
+    layers.append(Dense(initial_size, activation='relu', input_dim=input_dim))    
     if drop_out > 0:
         layers.append(Dropout(drop_out))
     
@@ -24,7 +24,7 @@ def build_ffnn_model(input_dim, num_hidden_layers=2, initial_size=128, drop_out=
     current_size = initial_size
     for _ in range(num_hidden_layers):        
         current_size = current_size // 2
-        layers.append(Dense(current_size, activation='relu'))        
+        layers.append(Dense(current_size, activation='relu'))                
         if drop_out > 0:
             layers.append(Dropout(drop_out))
     
@@ -206,6 +206,36 @@ def generate_future_predictions(model, lag_order, n_steps)-> np.ndarray:
         current_input = current_sequence.reshape(1, -1)
         # Get the next predicted value
         next_pred = model.predict(current_input, verbose=0)[0, 0]
+        # Append the prediction
+        future_predictions.append(next_pred)
+        # Update the sequence by removing the first element and adding the prediction
+        current_sequence = np.append(current_sequence[1:], next_pred)
+    
+    future_predictions_scaled = np.array(future_predictions)
+    future_predictions_descaled = scaler.inverse_transform(future_predictions_scaled.reshape(-1, 1)).flatten()
+    return future_predictions_descaled
+
+def generate_predictions_lin(model, lag_order, n_steps)-> np.ndarray:
+    """Predicts next n_steps data points using the trained model. 
+    model.scaled_data must be set, this is automatically set in the train function.
+
+    Args:
+        model (_type_): trained model
+        lag_order (_type_): sequence length
+        n_steps (_type_): data points to predict
+
+    Returns:
+        np.ndarray: Array of predicted values. The values are descaled.
+    """
+    last_sequence = model.scaled_data[-lag_order:, 0]
+    future_predictions = []
+    current_sequence = last_sequence.copy()
+    
+    for _ in range(n_steps):
+        # Reshape the sequence for prediction
+        current_input = current_sequence.reshape(1, -1)
+        # Get the next predicted value
+        next_pred = model.predict(current_input)
         # Append the prediction
         future_predictions.append(next_pred)
         # Update the sequence by removing the first element and adding the prediction
