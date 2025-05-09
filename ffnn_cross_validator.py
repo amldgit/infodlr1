@@ -15,8 +15,8 @@ df = pd.DataFrame(__mat_data__['Xtrain'])
 # Based on the previous analysis, we know the data is stationary and we can use lag features
 # From the previous analysis, we saw lag 16 was a good choice
 test_set_lags = [8, 10 , 20, 30, 40, 50, 100]
-hidden_layers = [1, 2, 3, 4]
-initial_sizes = [16, 32, 64, 128, 256]
+hidden_layers = [1] #[1, 2, 3, 4]
+initial_sizes = [256] #[16, 32, 64, 128, 256]
 # We will now test the parameter combinations above with cross-validation and select the best one.
 # Some of these combinations will not be reasonable, such as windows size = 8 and initial size = 128, but we will test them anyway,
 # because data is small, training is fast and it is easier to test them all and ignore the bad ones later.
@@ -24,7 +24,7 @@ initial_sizes = [16, 32, 64, 128, 256]
 best_mse = float("inf")
 best_model = None
 best_combination = None
-show_plots = True
+show_plots = False
 iterations = len(test_set_lags) * len(hidden_layers) * len(initial_sizes)
 current_iteration = 0
 test_results = []

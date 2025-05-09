@@ -215,7 +215,7 @@ def generate_future_predictions(model, lag_order, n_steps)-> np.ndarray:
     future_predictions_descaled = scaler.inverse_transform(future_predictions_scaled.reshape(-1, 1)).flatten()
     return future_predictions_descaled
 
-def generate_predictions_lin(model, lag_order, n_steps)-> np.ndarray:
+def generate_predictions_lin(model, lag_order, n_steps=200)-> np.ndarray:
     """Predicts next n_steps data points using the trained model. 
     model.scaled_data must be set, this is automatically set in the train function.
 
